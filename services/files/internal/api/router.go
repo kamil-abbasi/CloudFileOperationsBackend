@@ -1,4 +1,4 @@
-package internal
+package api
 
 import (
 	"github.com/gin-gonic/gin"
@@ -7,12 +7,12 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 )
 
-func NewApiRouter(config *config.Config) *gin.Engine {
+func NewRouter(config *config.Config) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/healthcheck")
 
-	v1.NewRouter(r, config)
+	v1.RegisterRoutes(r.Group("v1"), config)
 
 	return r
 }

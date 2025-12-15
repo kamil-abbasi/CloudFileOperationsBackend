@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
@@ -46,19 +47,19 @@ func (controller *FilesController) Upload(c *gin.Context) {
 		})
 	}
 
-	file := &files.File{
+	file, err := controller.service.Create(dtos.FileCreateDto{
 		Id:       id.String(),
 		Filename: rawFile.Filename,
 		Location: location + "/",
 		Size:     uint64(rawFile.Size),
-	}
-
-	controller.service.Create(files.FileCreateDto{
-		Id:       file.Id,
-		Filename: file.Filename,
-		Location: file.Location,
-		Size:     file.Size,
 	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, &shared.HttpError{
+			Code:    http.StatusInternalServerError,
+			Message: "Internal server error",
+		})
+	}
 
 	c.SaveUploadedFile(rawFile, userRoot+file.Location+file.Filename)
 	c.JSON(http.StatusCreated, file)

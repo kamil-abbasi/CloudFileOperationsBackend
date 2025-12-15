@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/api"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 )
@@ -24,7 +24,7 @@ func Run() error {
 	db := database.New(cfg)
 	db.Init()
 
-	r := internal.NewApiRouter(cfg)
+	r := api.NewRouter(cfg)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 
