@@ -1,6 +1,7 @@
 package files
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -84,7 +85,10 @@ func (controller *FilesController) Download(c *gin.Context) {
 		})
 	}
 
-	//sending file
+	// setting filename and forcing clients to download
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", file.Filename))
+
+	// sending file
 	filePath := controller.config.RootPath + "/user-dev" + file.Location + file.Filename
 	c.File(filePath)
 }
@@ -93,7 +97,27 @@ func (controller *FilesController) Download(c *gin.Context) {
 func (controller *FilesController) Remove(c *gin.Context) {}
 
 // GET /v1/files/:id
-func (controller *FilesController) FindOne(c *gin.Context) {}
+func (controller *FilesController) FindOne(c *gin.Context) {
+	id := c.Param("id")
+
+	file, found, err := controller.service.FindOne(id)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, &shared.HttpError{
+			Code:    http.StatusInternalServerError,
+			Message: "Internal server error",
+		})
+	}
+
+	if !found {
+		c.JSON(http.StatusNotFound, &shared.HttpError{
+			Code:    http.StatusNotFound,
+			Message: "File not found",
+		})
+	}
+
+	c.JSON(http.StatusOK, file)
+}
 
 // PATCH /v1/files/:id
 func (controller *FilesController) Update(c *gin.Context) {}
