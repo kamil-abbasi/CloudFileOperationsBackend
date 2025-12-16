@@ -7,7 +7,7 @@ import (
 
 type IFilesRepository interface {
 	FindOne(id string) (entities.File, bool, error)
-	Update(dto dtos.FileUpdateDto) (entities.File, bool, error)
-	Remove(id string) (entities.File, bool, error)
+	Update(dto dtos.FileUpdateDto) (bool, error)
+	Remove(id string) (bool, error)
 	Create(dto dtos.FileCreateDto) (entities.File, error)
 }
