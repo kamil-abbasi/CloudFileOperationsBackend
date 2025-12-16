@@ -29,9 +29,9 @@ func (repository *FilesSQLiteRepository) FindOne(id string) (entities.File, bool
 	var file entities.File
 
 	err := repository.db.QueryRow(
-		"SELECT id, filename, location, size FROM files WHERE id = ?",
+		"SELECT id, filename, location, size, user_id FROM files WHERE id = ?",
 		id,
-	).Scan(&file.Id, &file.Filename, &file.Location, &file.Size)
+	).Scan(&file.Id, &file.Filename, &file.Location, &file.Size, &file.UserId)
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
@@ -45,7 +45,7 @@ func (repository *FilesSQLiteRepository) FindOne(id string) (entities.File, bool
 }
 func (repository *FilesSQLiteRepository) Create(dto dtos.FileCreateDto) (entities.File, error) {
 
-	_, err := repository.db.Exec("INSERT INTO files VALUES(?,?,?,?)", dto.Id, dto.Filename, dto.Location, dto.Size)
+	_, err := repository.db.Exec("INSERT INTO files VALUES(?,?,?,?,?)", dto.Id, dto.Filename, dto.Location, dto.Size, dto.UserId)
 
 	if err != nil {
 		return entities.File{}, fmt.Errorf("failed to create file metadata, details: %v", err)
@@ -53,9 +53,41 @@ func (repository *FilesSQLiteRepository) Create(dto dtos.FileCreateDto) (entitie
 
 	return entities.File(dto), nil
 }
-func (repository *FilesSQLiteRepository) Update(dto dtos.FileUpdateDto) (entities.File, bool, error) {
-	return entities.File{}, true, nil
+func (r *FilesSQLiteRepository) Update(dto dtos.FileUpdateDto) (bool, error) {
+	result, err := r.db.Exec("UPDATE files SET filename = ?, location = ? WHERE id = ?", dto.Fields.Filename, dto.Fields.Location, dto.Where.Id)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to remove file metadata, details: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch the number of updated rows: %v", err)
+	}
+
+	if rowsAffected <= 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
-func (repository *FilesSQLiteRepository) Remove(id string) (entities.File, bool, error) {
-	return entities.File{}, true, nil
+func (repository *FilesSQLiteRepository) Remove(id string) (bool, error) {
+	result, err := repository.db.Exec("DELETE FROM files WHERE id = ?", id)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to remove file metadata, details: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch the number of deleted rows: %v", err)
+	}
+
+	if rowsAffected <= 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
