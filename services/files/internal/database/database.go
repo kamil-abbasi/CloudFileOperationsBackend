@@ -43,7 +43,8 @@ func (database *Database) Init() {
 			id TEXT NOT NULL PRIMARY KEY,
 			filename TEXT NOT NULL,
 			location TEXT NOT NULL,
-			size INTEGER NOT NULL
+			size INTEGER NOT NULL,
+			user_id TEXT NOT NULL
 		)
 	`
 
