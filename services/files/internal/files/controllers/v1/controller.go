@@ -6,119 +6,148 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
+	errs "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/errors"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
 type FilesController struct {
-	config  *config.Config
-	service *files.FileService
+	config       *config.Config
+	filesService *files.FilesService
 }
 
 func NewController(config *config.Config) FilesController {
 	return FilesController{
-		config:  config,
-		service: files.NewService(),
+		config:       config,
+		filesService: files.NewService(config),
 	}
 }
 
 // POST /v1/files
-func (controller *FilesController) Upload(c *gin.Context) {
-	rawFile, err := c.FormFile("file")
-	location := c.PostForm("location")
+func (c *FilesController) Upload(ctx *gin.Context) {
+	rawFile, err := ctx.FormFile("file")
+	location := ctx.PostForm("location")
+	userName := "user-dev"
 
-	userRoot := controller.config.RootPath + "/user-dev"
+	userRoot := fmt.Sprintf("%v/%v", c.config.RootPath, userName)
+	fullPath := fmt.Sprintf("%v/%v/%v", userRoot, location, rawFile.Filename)
+	userPath := fmt.Sprintf("/%v/%v", userName, location)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &shared.HttpError{
+		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
 		})
+
+		return
 	}
 
 	id, err := uuid.NewUUID()
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &shared.HttpError{
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",
 		})
+
+		return
 	}
 
-	file, err := controller.service.Create(dtos.FileCreateDto{
+	file, err := c.filesService.Create(dtos.FileCreateDto{
 		Id:       id.String(),
 		Filename: rawFile.Filename,
-		Location: location + "/",
+		Location: userPath,
 		Size:     uint64(rawFile.Size),
 	})
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &shared.HttpError{
+
+		_, ok := err.(*errs.FileAlreadyExistsError)
+
+		if ok {
+			ctx.JSON(http.StatusConflict, &shared.HttpError{
+				Code:    http.StatusConflict,
+				Message: fmt.Sprintf("File %v already exists", userPath),
+			})
+
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",
 		})
+
+		return
 	}
 
-	c.SaveUploadedFile(rawFile, userRoot+file.Location+file.Filename)
-	c.JSON(http.StatusCreated, file)
+	ctx.SaveUploadedFile(rawFile, fullPath)
+	ctx.JSON(http.StatusCreated, file)
 }
 
 // GET /v1/files/:id/download
-func (controller *FilesController) Download(c *gin.Context) {
-	id := c.Param("id")
+func (c *FilesController) Download(ctx *gin.Context) {
+	id := ctx.Param("id")
 
-	//find file
-	file, found, err := controller.service.FindOne(id)
+	file, found, err := c.filesService.FindOne(id)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &shared.HttpError{
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",
 		})
+
+		return
 	}
 
 	if !found {
-		c.JSON(http.StatusNotFound, &shared.HttpError{
+		ctx.JSON(http.StatusNotFound, &shared.HttpError{
 			Code:    http.StatusNotFound,
 			Message: "File not found",
 		})
+
+		return
 	}
 
 	// setting filename and forcing clients to download
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", file.Filename))
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", file.Filename))
 
 	// sending file
-	filePath := controller.config.RootPath + "/user-dev" + file.Location + file.Filename
-	c.File(filePath)
+	filePath := c.config.RootPath + file.Location + "/" + file.Filename
+
+	fmt.Println(filePath)
+
+	ctx.File(filePath)
 }
 
-// DELETE /v1/files/:id
-func (controller *FilesController) Remove(c *gin.Context) {}
-
 // GET /v1/files/:id
-func (controller *FilesController) FindOne(c *gin.Context) {
-	id := c.Param("id")
+func (c *FilesController) FindOne(ctx *gin.Context) {
+	id := ctx.Param("id")
 
-	file, found, err := controller.service.FindOne(id)
+	file, found, err := c.filesService.FindOne(id)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, &shared.HttpError{
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",
 		})
 	}
 
 	if !found {
-		c.JSON(http.StatusNotFound, &shared.HttpError{
+		ctx.JSON(http.StatusNotFound, &shared.HttpError{
 			Code:    http.StatusNotFound,
 			Message: "File not found",
 		})
 	}
 
-	c.JSON(http.StatusOK, file)
+	ctx.JSON(http.StatusOK, file)
 }
 
 // PATCH /v1/files/:id
-func (controller *FilesController) Update(c *gin.Context) {}
+func (c *FilesController) Update(ctx *gin.Context) {}
+
+// DELETE /v1/files/:id
+func (c *FilesController) Remove(ctx *gin.Context) {}
