@@ -45,7 +45,14 @@ func (database *Database) Init() {
 			location TEXT NOT NULL,
 			size INTEGER NOT NULL,
 			user_id TEXT NOT NULL
-		)
+		);
+
+		CREATE TABLE IF NOT EXISTS folders (
+			id TEXT NOT NULL PRIMARY KEY,
+			name TEXT NOT NULL,
+			location TEXT NOT NULL,
+			user_id TEXT NOT NULL
+		);
 	`
 
 		_, err = db.Exec(statement)

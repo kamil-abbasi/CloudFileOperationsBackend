@@ -10,4 +10,5 @@ type IFilesRepository interface {
 	Update(dto dtos.FileUpdateDto) (bool, error)
 	Remove(id string) (bool, error)
 	Create(dto dtos.FileCreateDto) (entities.File, error)
+	CreateFolder(dto dtos.FolderCreateDto) (entities.Folder, error)
 }

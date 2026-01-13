@@ -57,6 +57,35 @@ func (s *FilesService) Create(dto dtos.FileCreateDto) (entities.File, error) {
 	return s.repository.Create(dto)
 }
 
+func (s *FilesService) CreateFolder(dto dtos.FolderCreateDto) (entities.Folder, error) {
+	fullPath := filepath.Clean(
+		filepath.Join(
+			s.config.RootPath,
+			dto.UserId,
+			dto.Location,
+			dto.Name,
+		),
+	)
+
+	exists, err := shared.DoesFileExist(fullPath)
+
+	if err != nil {
+		return entities.Folder{}, err
+	}
+
+	if exists {
+		return entities.Folder{}, &errs.FolderAlreadyExistsError{}
+	}
+
+	err = os.MkdirAll(fullPath, 0755)
+
+	if err != nil {
+		return entities.Folder{}, fmt.Errorf("error while creating directory: %v", err)
+	}
+
+	return s.repository.CreateFolder(dto)
+}
+
 func (s *FilesService) Update(dto dtos.FileUpdateDto) (entities.File, bool, error) {
 	file, found, err := s.repository.FindOne(dto.Where.Id)
 	fullPath := filepath.Join(filepath.Join(

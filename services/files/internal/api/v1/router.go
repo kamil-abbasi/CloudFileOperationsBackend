@@ -23,4 +23,11 @@ func RegisterRoutes(rg *gin.RouterGroup, config *config.Config) {
 		filesRouter.DELETE("/:id", controller.Remove)
 	}
 
+	foldersRouter := rg.Group("/folders")
+	{
+		foldersController := files.NewFoldersController(config)
+
+		foldersRouter.POST("", foldersController.Create)
+	}
+
 }

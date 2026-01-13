@@ -53,6 +53,16 @@ func (repository *FilesSQLiteRepository) Create(dto dtos.FileCreateDto) (entitie
 
 	return entities.File(dto), nil
 }
+
+func (repository *FilesSQLiteRepository) CreateFolder(dto dtos.FolderCreateDto) (entities.Folder, error) {
+	_, err := repository.db.Exec("INSERT INTO folders VALUES(?,?,?,?)", dto.Id, dto.Name, dto.Location, dto.UserId)
+
+	if err != nil {
+		return entities.Folder{}, fmt.Errorf("failed to create folder metadata, details: %v", err)
+	}
+
+	return entities.Folder(dto), nil
+}
 func (r *FilesSQLiteRepository) Update(dto dtos.FileUpdateDto) (bool, error) {
 	result, err := r.db.Exec("UPDATE files SET filename = ?, location = ? WHERE id = ?", dto.Fields.Filename, dto.Fields.Location, dto.Where.Id)
 
