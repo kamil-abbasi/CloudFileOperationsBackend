@@ -24,7 +24,7 @@ func NewSQLiteRepository(config *config.Config) interfaces.IFilesRepository {
 		config: config,
 	}
 }
-
+//abcd
 func (repository *FilesSQLiteRepository) FindOne(id string) (entities.File, bool, error) {
 	var file entities.File
 
