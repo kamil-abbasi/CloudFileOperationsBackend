@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/patrickmn/go-cache"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
@@ -17,11 +20,13 @@ import (
 
 type FilesController struct {
 	config       *config.Config
+	cache        *cache.Cache
 	filesService *files.FilesService
 }
 
-func NewController(config *config.Config) FilesController {
+func NewController(config *config.Config, cache *cache.Cache) FilesController {
 	return FilesController{
+		cache:        cache,
 		config:       config,
 		filesService: files.NewService(config),
 	}
@@ -29,9 +34,50 @@ func NewController(config *config.Config) FilesController {
 
 // POST /v1/files
 func (c *FilesController) Upload(ctx *gin.Context) {
+	var re, err = regexp.Compile(`^(\/[\w-]+)*([\w-])*$`)
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
+			Code:    http.StatusInternalServerError,
+			Message: "Internal server error",
+		})
+
+		return
+	}
+
 	rawFile, err := ctx.FormFile("file")
 	location := ctx.PostForm("location")
+	idempotencyKey := ctx.PostForm("idempotencyKey")
 	userId := "user-dev"
+	requestId := idempotencyKey + userId
+
+	if idempotencyKey == "" {
+		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
+			Code:    http.StatusBadRequest,
+			Message: "Missing idempotency key",
+		})
+
+		return
+	}
+
+	response, found := c.cache.Get(requestId)
+
+	if found {
+		fmt.Println("cache hit")
+
+		ctx.JSON(http.StatusCreated, response)
+
+		return
+	}
+
+	if len(re.FindStringIndex(location)) == 0 {
+		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
+			Code:    http.StatusBadRequest,
+			Message: "Invalid location",
+		})
+
+		return
+	}
 
 	fullPath := filepath.Clean(filepath.Join(
 		c.config.RootPath,
@@ -90,6 +136,8 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 
 		return
 	}
+
+	c.cache.Set(requestId, file, 15*time.Minute)
 
 	ctx.SaveUploadedFile(rawFile, fullPath)
 	ctx.JSON(http.StatusCreated, file)
