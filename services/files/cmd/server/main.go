@@ -3,10 +3,12 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/api"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
+	"github.com/patrickmn/go-cache"
 )
 
 func main() {
@@ -24,7 +26,9 @@ func Run() error {
 	db := database.New(cfg)
 	db.Init()
 
-	r := api.NewRouter(cfg)
+	cache := cache.New(15*time.Minute, 10*time.Minute)
+
+	r := api.NewRouter(cfg, cache)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 
