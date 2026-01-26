@@ -3,6 +3,7 @@ package files
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -88,6 +89,16 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 			Message: "Internal server error",
 		})
 
+		return
+	}
+
+	// Create directory structure if it doesn't exist
+	err = os.MkdirAll(filepath.Dir(fullPath), 0755)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
+			Code:    http.StatusInternalServerError,
+			Message: "Failed to create directory structure",
+		})
 		return
 	}
 
