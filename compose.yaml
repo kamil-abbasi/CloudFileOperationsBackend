@@ -3,6 +3,7 @@ services:
     build:
       context: ./services/reverse-proxy
       dockerfile: Dockerfile
+    restart: always
     env_file:
       - ./services/reverse-proxy/.env
     volumes:
@@ -18,6 +19,7 @@ services:
       files:
         condition: service_healthy
   files:
+    restart: always
     build:
       context: ./services/files
       target: dev
@@ -33,5 +35,41 @@ services:
       timeout: 30s
       retries: 5
       start_period: 10s
+    depends_on:
+      database:
+        condition: service_healthy
+      file-storage:
+        condition: service_healthy
+
+  file-storage:
+    build:
+      context: ./services/file-storage
+    restart: always
+    env_file:
+      - ./services/file-storage/.env
+    volumes:
+      - file-storage-data:/data
+    healthcheck:
+      test: ['CMD', "curl", "-I", "http://localhost:8333/healthz"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  database:
+    build:
+      context: ./services/database
+    restart: always
+    env_file:
+      - ./services/database/.env
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD', 'pg_isready']
+      timeout: 30s
+      retries: 5
+      start_period: 20s
 volumes:
   files-data:
+  db-data:
+  file-storage-data:
