@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/entities"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
@@ -16,9 +15,7 @@ type FilesSQLiteRepository struct {
 	config *config.Config
 }
 
-func NewSQLiteRepository(config *config.Config) interfaces.IFilesRepository {
-	db := database.GetInstance()
-
+func NewSQLiteRepository(config *config.Config, db *sql.DB) interfaces.IFilesRepository {
 	return &FilesSQLiteRepository{
 		db:     db,
 		config: config,
