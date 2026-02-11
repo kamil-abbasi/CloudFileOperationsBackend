@@ -29,5 +29,21 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 		return nil, err
 	}
 
+	statement := `
+		CREATE TABLE IF NOT EXISTS files (
+			id TEXT NOT NULL PRIMARY KEY,
+			filename TEXT NOT NULL,
+			location TEXT NOT NULL,
+			size INTEGER NOT NULL,
+			user_id TEXT NOT NULL
+		)
+	`
+
+	_, err = db.Exec(statement)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create tables, details: %v", err)
+	}
+
 	return db, nil
 }
