@@ -2,18 +2,30 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
 
-	v1 "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/api/v1"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
 )
 
-func NewRouter(config *config.Config, cache *cache.Cache) *gin.Engine {
+func NewRouter(filesController *files.FilesController) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/healthcheck")
 
-	v1.RegisterRoutes(r.Group("v1"), config, cache)
+	v1 := r.Group("/v1")
+	{
+		filesRouter := v1.Group("/files")
+		{
+			filesRouter.GET("/:id", filesController.FindOne)
+
+			filesRouter.GET("/:id/download", filesController.Download)
+
+			filesRouter.POST("", filesController.Upload)
+
+			filesRouter.PATCH("/:id", filesController.Update)
+
+			filesRouter.DELETE("/:id", filesController.Remove)
+		}
+	}
 
 	return r
 }

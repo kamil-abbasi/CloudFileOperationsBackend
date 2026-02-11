@@ -2,26 +2,22 @@ package v1
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
 
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
-	files "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/controllers/v1"
+	files "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
 )
 
-func RegisterRoutes(rg *gin.RouterGroup, config *config.Config, cache *cache.Cache) {
+func RegisterRoutes(rg *gin.RouterGroup, filesController *files.FilesController) {
 	filesRouter := rg.Group("/files")
 	{
-		controller := files.NewController(config, cache)
+		filesRouter.GET("/:id", filesController.FindOne)
 
-		filesRouter.GET("/:id", controller.FindOne)
+		filesRouter.GET("/:id/download", filesController.Download)
 
-		filesRouter.GET("/:id/download", controller.Download)
+		filesRouter.POST("", filesController.Upload)
 
-		filesRouter.POST("", controller.Upload)
+		filesRouter.PATCH("/:id", filesController.Update)
 
-		filesRouter.PATCH("/:id", controller.Update)
-
-		filesRouter.DELETE("/:id", controller.Remove)
+		filesRouter.DELETE("/:id", filesController.Remove)
 	}
 
 }
