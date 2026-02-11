@@ -18,11 +18,8 @@ type FilesService struct {
 	config     *config.Config
 }
 
-func NewService(config *config.Config) *FilesService {
-
-	repository := NewSQLiteRepository(config)
-
-	return &FilesService{
+func NewService(config *config.Config, repository interfaces.IFilesRepository) FilesService {
+	return FilesService{
 		repository: repository,
 		config:     config,
 	}
