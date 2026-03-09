@@ -24,4 +24,14 @@ func RegisterRoutes(rg *gin.RouterGroup, config *config.Config, cache *cache.Cac
 		filesRouter.DELETE("/:id", controller.Remove)
 	}
 
+	directoriesRouter := rg.Group("/directories")
+	{
+		dirController := files.NewDirectoriesController(config)
+
+		directoriesRouter.POST("", dirController.Create)
+
+		directoriesRouter.DELETE("", dirController.Remove)
+
+		directoriesRouter.GET("/download", dirController.Download)
+	}
 }

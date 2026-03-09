@@ -25,6 +25,53 @@ func NewSQLiteRepository(config *config.Config) interfaces.IFilesRepository {
 	}
 }
 
+func (repository *FilesSQLiteRepository) FindByLocation(userId string, location string) ([]entities.File, error) {
+	rows, err := repository.db.Query(
+		"SELECT id, filename, location, size, user_id FROM files WHERE user_id = ? AND (location = ? OR location LIKE ?)",
+		userId, location, location+"/%",
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find files by location, details: %v", err)
+	}
+
+	defer rows.Close()
+
+	var files []entities.File
+
+	for rows.Next() {
+		var file entities.File
+		err := rows.Scan(&file.Id, &file.Filename, &file.Location, &file.Size, &file.UserId)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row, details: %v", err)
+		}
+
+		files = append(files, file)
+	}
+
+	return files, nil
+}
+
+func (repository *FilesSQLiteRepository) RemoveByLocation(userId string, location string) (int64, error) {
+	result, err := repository.db.Exec(
+		"DELETE FROM files WHERE user_id = ? AND (location = ? OR location LIKE ?)",
+		userId, location, location+"/%",
+	)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to remove files by location, details: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch the number of deleted rows: %v", err)
+	}
+
+	return rowsAffected, nil
+}
+
 func (repository *FilesSQLiteRepository) FindOne(id string) (entities.File, bool, error) {
 	var file entities.File
 

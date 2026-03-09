@@ -1,7 +1,9 @@
 package files
 
 import (
+	"archive/zip"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -143,4 +145,78 @@ func (s *FilesService) Remove(id string) (entities.File, bool, error) {
 	s.repository.Remove(id)
 
 	return file, true, nil
+}
+
+func (s *FilesService) CreateDirectory(userId string, location string) error {
+	dirPath := filepath.Clean(
+		filepath.Join(s.config.RootPath, userId, location),
+	)
+
+	return os.MkdirAll(dirPath, 0755)
+}
+
+func (s *FilesService) FindByLocation(userId string, location string) ([]entities.File, error) {
+	return s.repository.FindByLocation(userId, location)
+}
+
+func (s *FilesService) RemoveDirectory(userId string, location string) (int64, error) {
+	dirPath := filepath.Clean(
+		filepath.Join(s.config.RootPath, userId, location),
+	)
+
+	err := os.RemoveAll(dirPath)
+
+	if err != nil {
+		return 0, fmt.Errorf("error while removing directory: %v", err)
+	}
+
+	return s.repository.RemoveByLocation(userId, location)
+}
+
+func (s *FilesService) DownloadDirectory(userId string, location string, writer io.Writer) error {
+	files, err := s.repository.FindByLocation(userId, location)
+
+	if err != nil {
+		return err
+	}
+
+	zipWriter := zip.NewWriter(writer)
+	defer zipWriter.Close()
+
+	for _, file := range files {
+		fullPath := filepath.Clean(
+			filepath.Join(s.config.RootPath, file.UserId, file.Location, file.Filename),
+		)
+
+		// relative path inside ZIP based on location prefix
+		relativePath := filepath.Join(file.Location, file.Filename)
+		if len(location) > 0 {
+			rel, err := filepath.Rel(location, relativePath)
+			if err == nil {
+				relativePath = rel
+			}
+		}
+
+		srcFile, err := os.Open(fullPath)
+
+		if err != nil {
+			return fmt.Errorf("error while opening file %v: %v", fullPath, err)
+		}
+
+		zipEntry, err := zipWriter.Create(relativePath)
+
+		if err != nil {
+			srcFile.Close()
+			return fmt.Errorf("error while creating zip entry: %v", err)
+		}
+
+		_, err = io.Copy(zipEntry, srcFile)
+		srcFile.Close()
+
+		if err != nil {
+			return fmt.Errorf("error while writing to zip: %v", err)
+		}
+	}
+
+	return nil
 }
