@@ -1,3 +1,7 @@
 package dtos
 
-type FileFindDto struct{}
+type FindFilesDto struct {
+	Where struct {
+		DirectoryId string
+	}
+}

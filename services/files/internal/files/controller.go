@@ -2,6 +2,7 @@ package files
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"regexp"
@@ -105,15 +106,17 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 		return
 	}
 
-	file, err := c.filesService.Create(dtos.FileCreateDto{
+	file, err := c.filesService.Create(dtos.CreateFileDto{
 		Id:       id.String(),
-		Filename: rawFile.Filename,
+		Name:     rawFile.Filename,
 		Location: userPath,
 		Size:     uint64(rawFile.Size),
 		UserId:   userId,
 	})
 
 	if err != nil {
+
+		log.Print(err)
 
 		_, ok := err.(*errs.FileAlreadyExistsError)
 
@@ -165,13 +168,13 @@ func (c *FilesController) Download(ctx *gin.Context) {
 	}
 
 	// setting filename and informing clients to download
-	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", file.Filename))
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", file.Name))
 
 	fullPath := filepath.Clean(filepath.Join(
 		c.config.RootPath,
 		file.UserId,
 		file.Location,
-		file.Filename,
+		file.Name,
 	))
 
 	// sending file
@@ -223,9 +226,10 @@ func (c *FilesController) Update(ctx *gin.Context) {
 		return
 	}
 
-	updateDto := dtos.FileUpdateDto{}
+	updateDto := dtos.UpdateFileDto{}
 	updateDto.Where.Id = id
-	updateDto.Fields = fields
+	updateDto.Fields.Name = fields.Filename
+	updateDto.Fields.Location = fields.Location
 
 	file, updated, err := c.filesService.Update(updateDto)
 
@@ -257,6 +261,8 @@ func (c *FilesController) Remove(ctx *gin.Context) {
 	file, removed, err := c.filesService.Remove(id)
 
 	if err != nil {
+		log.Print(err)
+
 		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",

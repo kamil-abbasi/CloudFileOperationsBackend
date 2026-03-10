@@ -1,11 +1,12 @@
 package dtos
 
-type FileUpdateDto struct {
+type UpdateFileDto struct {
 	Where struct {
 		Id string
 	}
 	Fields struct {
-		Filename string
-		Location string
+		DirectoryId string
+		Name        string
+		Location    string
 	}
 }

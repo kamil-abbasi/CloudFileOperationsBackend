@@ -21,7 +21,7 @@ type ModuleExports struct {
 }
 
 func NewModule(deps *ModuleDeps) *ModuleExports {
-	repository := NewSQLiteRepository(deps.Config, deps.Db)
+	repository := NewPostgresRepository(deps.Config, deps.Db)
 	service := NewService(deps.Config, repository)
 	controller := NewController(deps.Config, deps.Cache, &service)
 

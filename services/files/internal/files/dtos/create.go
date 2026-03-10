@@ -1,9 +1,10 @@
 package dtos
 
-type FileCreateDto struct {
-	Id       string
-	UserId   string
-	Filename string
-	Location string
-	Size     uint64
+type CreateFileDto struct {
+	Id          string
+	UserId      string
+	DirectoryId string
+	Name        string
+	Location    string
+	Size        uint64
 }

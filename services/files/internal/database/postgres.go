@@ -29,17 +29,34 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 		return nil, err
 	}
 
-	statement := `
-		CREATE TABLE IF NOT EXISTS files (
-			id TEXT NOT NULL PRIMARY KEY,
-			filename TEXT NOT NULL,
+	createDirectoriesTableStatement := `
+		CREATE TABLE IF NOT EXISTS directories (
+			id UUID NOT NULL PRIMARY KEY,
+			name TEXT NOT NULL,
 			location TEXT NOT NULL,
-			size INTEGER NOT NULL,
-			user_id TEXT NOT NULL
+			user_id TEXT NOT NULL,
+			parent_id UUID,
+			FOREIGN KEY (parent_id)
+				REFERENCES directories(id)
+				ON DELETE CASCADE
 		)
 	`
 
-	_, err = db.Exec(statement)
+	createFilesTableStatement := `
+		CREATE TABLE IF NOT EXISTS files (
+			id UUID NOT NULL PRIMARY KEY,
+			name TEXT NOT NULL,
+			location TEXT NOT NULL,
+			size INTEGER NOT NULL,
+			user_id TEXT NOT NULL,
+			directory_id UUID,
+			FOREIGN KEY(directory_id)
+				REFERENCES directories(id)
+		)
+	`
+
+	_, err = db.Exec(createDirectoriesTableStatement)
+	_, err = db.Exec(createFilesTableStatement)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create tables, details: %v", err)

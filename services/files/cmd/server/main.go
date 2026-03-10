@@ -9,6 +9,7 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/api"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
 	"github.com/patrickmn/go-cache"
 )
@@ -33,14 +34,6 @@ func Run() error {
 		return fmt.Errorf("Failed to create directory for user files. Details: %v", err)
 	}
 
-	sqlite, err := database.NewSQLite(cfg)
-
-	if err != nil {
-		return err
-	}
-
-	defer sqlite.Close()
-
 	postgres, err := database.NewPostgres(database.PostgresConfig{
 		Db:       cfg.PgDb,
 		User:     cfg.PgUser,
@@ -57,12 +50,18 @@ func Run() error {
 	cache := cache.New(15*time.Minute, 10*time.Minute)
 
 	filesModule := files.NewModule(&files.ModuleDeps{
-		Db:     sqlite,
+		Db:     postgres,
 		Config: cfg,
 		Cache:  cache,
 	})
+	directoriesModule := directories.NewModule(&directories.ModuleDeps{
+		Db:              postgres,
+		Config:          cfg,
+		Cache:           cache,
+		FilesRepository: *filesModule.Repository,
+	})
 
-	r := api.NewRouter(filesModule.Controller)
+	r := api.NewRouter(filesModule.Controller, directoriesModule.Controller)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 

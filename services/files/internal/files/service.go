@@ -29,13 +29,13 @@ func (s *FilesService) FindOne(id string) (entities.File, bool, error) {
 	return s.repository.FindOne(id)
 }
 
-func (s *FilesService) Create(dto dtos.FileCreateDto) (entities.File, error) {
+func (s *FilesService) Create(dto dtos.CreateFileDto) (entities.File, error) {
 	fullPath := filepath.Clean(
 		filepath.Join(
 			s.config.RootPath,
 			dto.UserId,
 			dto.Location,
-			dto.Filename,
+			dto.Name,
 		),
 	)
 
@@ -54,13 +54,13 @@ func (s *FilesService) Create(dto dtos.FileCreateDto) (entities.File, error) {
 	return s.repository.Create(dto)
 }
 
-func (s *FilesService) Update(dto dtos.FileUpdateDto) (entities.File, bool, error) {
+func (s *FilesService) Update(dto dtos.UpdateFileDto) (entities.File, bool, error) {
 	file, found, err := s.repository.FindOne(dto.Where.Id)
 	fullPath := filepath.Join(filepath.Join(
 		s.config.RootPath,
 		file.UserId,
 		file.Location,
-		file.Filename,
+		file.Name,
 	))
 
 	if err != nil {
@@ -71,12 +71,16 @@ func (s *FilesService) Update(dto dtos.FileUpdateDto) (entities.File, bool, erro
 		return entities.File{}, false, nil
 	}
 
-	if dto.Fields.Filename == "" {
-		dto.Fields.Filename = file.Filename
+	if dto.Fields.Name == "" {
+		dto.Fields.Name = file.Name
 	}
 
 	if dto.Fields.Location == "" {
 		dto.Fields.Location = file.Location
+	}
+
+	if dto.Fields.DirectoryId == "" {
+		dto.Fields.DirectoryId = file.DirectoryId
 	}
 
 	fmt.Println(dto)
@@ -85,7 +89,7 @@ func (s *FilesService) Update(dto dtos.FileUpdateDto) (entities.File, bool, erro
 		s.config.RootPath,
 		file.UserId,
 		dto.Fields.Location,
-		dto.Fields.Filename,
+		dto.Fields.Name,
 	))
 
 	err = os.MkdirAll(filepath.Dir(newFullPath), 0755)
@@ -103,11 +107,12 @@ func (s *FilesService) Update(dto dtos.FileUpdateDto) (entities.File, bool, erro
 	s.repository.Update(dto)
 
 	return entities.File{
-		Id:       file.Id,
-		UserId:   file.UserId,
-		Size:     file.Size,
-		Location: dto.Fields.Location,
-		Filename: dto.Fields.Filename,
+		Id:          file.Id,
+		UserId:      file.UserId,
+		Size:        file.Size,
+		Location:    dto.Fields.Location,
+		Name:        dto.Fields.Name,
+		DirectoryId: dto.Fields.DirectoryId,
 	}, true, nil
 }
 
@@ -127,7 +132,7 @@ func (s *FilesService) Remove(id string) (entities.File, bool, error) {
 			s.config.RootPath,
 			file.UserId,
 			file.Location,
-			file.Filename,
+			file.Name,
 		),
 	)
 

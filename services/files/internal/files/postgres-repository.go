@@ -22,10 +22,10 @@ func NewPostgresRepository(config *config.Config, db *sql.DB) interfaces.IFilesR
 	}
 }
 
-func (repository *FilesPostgresRepository) Find() ([]entities.File, error) {
+func (repository *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entities.File, error) {
 	var files []entities.File
 
-	rows, err := repository.db.Query("SELECT * FROM files")
+	rows, err := repository.db.Query("SELECT * FROM files WHERE directory_id = $1", dto.Where.DirectoryId)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find files: %v", err)
@@ -36,7 +36,7 @@ func (repository *FilesPostgresRepository) Find() ([]entities.File, error) {
 	for rows.Next() {
 		var file entities.File
 
-		err := rows.Scan(&file.Id, &file.Filename, &file.Location, &file.Size, &file.UserId)
+		err := rows.Scan(&file.Id, &file.Name, &file.Location, &file.Size, &file.UserId, &file.DirectoryId)
 
 		if err != nil {
 			return nil, err
@@ -55,7 +55,7 @@ func (repository *FilesPostgresRepository) Find() ([]entities.File, error) {
 func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bool, error) {
 	var file entities.File
 
-	err := repository.db.QueryRow("SELECT * FROM files WHERE id = ?", id).Scan(&file.Id, &file.Filename, &file.Location, &file.Size, &file.UserId)
+	err := repository.db.QueryRow("SELECT * FROM files WHERE id = $1", id).Scan(&file.Id, &file.Name, &file.Location, &file.Size, &file.UserId, &file.DirectoryId)
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
@@ -68,8 +68,12 @@ func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bo
 	return file, true, nil
 }
 
-func (repository *FilesPostgresRepository) Create(dto dtos.FileCreateDto) (entities.File, error) {
-	_, err := repository.db.Exec("INSERT INTO files VALUES(?,?,?,?,?)", dto.Id, dto.Filename, dto.Location, dto.Size, dto.UserId)
+func (repository *FilesPostgresRepository) Create(dto dtos.CreateFileDto) (entities.File, error) {
+	_, err := repository.db.Exec(
+		`INSERT INTO
+		files(id, name, location, size, user_id, directory_id)
+		VALUES($1, $2, $3, $4, $5, $6)`,
+		dto.Id, dto.Name, dto.Location, dto.Size, dto.UserId, dto.DirectoryId)
 
 	if err != nil {
 		return entities.File{}, fmt.Errorf("failed to create file metadata, details: %v", err)
@@ -78,8 +82,8 @@ func (repository *FilesPostgresRepository) Create(dto dtos.FileCreateDto) (entit
 	return entities.File(dto), nil
 }
 
-func (repository *FilesPostgresRepository) Update(dto dtos.FileUpdateDto) (bool, error) {
-	result, err := repository.db.Exec("UPDATE files SET filename = ?, location = ? WHERE id = ?", dto.Fields.Filename, dto.Fields.Location, dto.Where.Id)
+func (repository *FilesPostgresRepository) Update(dto dtos.UpdateFileDto) (bool, error) {
+	result, err := repository.db.Exec("UPDATE files SET name = $1, location = $2,directory_id = $3 WHERE id = $4", dto.Fields.Name, dto.Fields.Location, dto.Fields.DirectoryId, dto.Where.Id)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove file metadata, details: %v", err)
@@ -99,7 +103,7 @@ func (repository *FilesPostgresRepository) Update(dto dtos.FileUpdateDto) (bool,
 }
 
 func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
-	result, err := repository.db.Exec("DELETE FROM files WHERE id = ?", id)
+	result, err := repository.db.Exec("DELETE FROM files WHERE id = $1", id)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove file metadata, details: %v", err)
