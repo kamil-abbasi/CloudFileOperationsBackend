@@ -32,10 +32,9 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 	createDirectoriesTableStatement := `
 		CREATE TABLE IF NOT EXISTS directories (
 			id UUID NOT NULL PRIMARY KEY,
-			name TEXT NOT NULL,
-			location TEXT NOT NULL,
 			user_id TEXT NOT NULL,
 			parent_id UUID,
+			name TEXT NOT NULL,
 			FOREIGN KEY (parent_id)
 				REFERENCES directories(id)
 				ON DELETE CASCADE
@@ -45,11 +44,10 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 	createFilesTableStatement := `
 		CREATE TABLE IF NOT EXISTS files (
 			id UUID NOT NULL PRIMARY KEY,
-			name TEXT NOT NULL,
-			location TEXT NOT NULL,
-			size INTEGER NOT NULL,
 			user_id TEXT NOT NULL,
 			directory_id UUID,
+			name TEXT NOT NULL,
+			size INTEGER NOT NULL,
 			FOREIGN KEY(directory_id)
 				REFERENCES directories(id)
 		)

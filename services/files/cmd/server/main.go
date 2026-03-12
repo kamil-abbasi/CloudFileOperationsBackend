@@ -11,6 +11,7 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/storage"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -49,19 +50,18 @@ func Run() error {
 
 	cache := cache.New(15*time.Minute, 10*time.Minute)
 
-	filesModule := files.NewModule(&files.ModuleDeps{
-		Db:     postgres,
-		Config: cfg,
-		Cache:  cache,
-	})
-	directoriesModule := directories.NewModule(&directories.ModuleDeps{
-		Db:              postgres,
-		Config:          cfg,
-		Cache:           cache,
-		FilesRepository: *filesModule.Repository,
-	})
+	storageAdapter := storage.NewFileSystemStorageAdapter(cfg)
 
-	r := api.NewRouter(filesModule.Controller, directoriesModule.Controller)
+	filesRepository := files.NewPostgresRepository(cfg, postgres)
+	directoriesRepository := directories.NewPostgresRepository(cfg, postgres)
+
+	filesService := files.NewService(filesRepository, directoriesRepository, storageAdapter)
+	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository)
+
+	filesController := files.NewController(cfg, cache, &filesService)
+	directoriesController := directories.NewController(cfg, cache, &directoriesService)
+
+	r := api.NewRouter(&filesController, &directoriesController)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 

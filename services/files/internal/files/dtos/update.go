@@ -5,8 +5,7 @@ type UpdateFileDto struct {
 		Id string
 	}
 	Fields struct {
-		DirectoryId string
 		Name        string
-		Location    string
+		DirectoryId string
 	}
 }

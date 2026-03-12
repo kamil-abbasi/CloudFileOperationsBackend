@@ -5,6 +5,5 @@ type File struct {
 	UserId      string
 	DirectoryId string
 	Name        string
-	Location    string
 	Size        uint64
 }

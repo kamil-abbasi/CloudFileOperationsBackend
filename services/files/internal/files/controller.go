@@ -3,18 +3,16 @@ package files
 import (
 	"fmt"
 	"log"
+	"mime"
 	"net/http"
 	"path/filepath"
-	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
-	errs "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/errors"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
@@ -34,21 +32,11 @@ func NewController(config *config.Config, cache *cache.Cache, service *FilesServ
 
 // POST /v1/files
 func (c *FilesController) Upload(ctx *gin.Context) {
-	var pathRegex, err = regexp.Compile(`^(\/[\w-]+)*([\w-])*$`)
-
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
 	rawFile, err := ctx.FormFile("file")
-	location := ctx.PostForm("location")
-	idempotencyKey := ctx.PostForm("idempotencyKey")
+	directoryId := ctx.PostForm("directoryId")
 	userId := "user-dev"
+
+	idempotencyKey := ctx.PostForm("idempotencyKey")
 	requestId := idempotencyKey + userId
 
 	if idempotencyKey == "" {
@@ -68,34 +56,7 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 		return
 	}
 
-	if len(pathRegex.FindStringIndex(location)) == 0 {
-		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
-			Code:    http.StatusBadRequest,
-			Message: "Invalid location",
-		})
-
-		return
-	}
-
-	fullPath := filepath.Clean(filepath.Join(
-		c.config.RootPath,
-		userId,
-		location,
-		rawFile.Filename,
-	))
-	userPath := filepath.Clean(location)
-	userFullPath := filepath.Clean(filepath.Join(location, rawFile.Filename))
-
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
-
-		return
-	}
-
-	id, err := uuid.NewUUID()
+	reader, err := rawFile.Open()
 
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
@@ -106,24 +67,22 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 		return
 	}
 
+	defer reader.Close()
+
 	file, err := c.filesService.Create(dtos.CreateFileDto{
-		Id:       id.String(),
-		Name:     rawFile.Filename,
-		Location: userPath,
-		Size:     uint64(rawFile.Size),
-		UserId:   userId,
-	})
+		Name:        rawFile.Filename,
+		UserId:      userId,
+		DirectoryId: directoryId,
+	}, reader)
 
 	if err != nil {
 
-		log.Print(err)
-
-		_, ok := err.(*errs.FileAlreadyExistsError)
+		_, ok := err.(*shared.FileAlreadyExistsError)
 
 		if ok {
 			ctx.JSON(http.StatusConflict, &shared.HttpError{
 				Code:    http.StatusConflict,
-				Message: fmt.Sprintf("File %v already exists", userFullPath),
+				Message: "File already exists",
 			})
 
 			return
@@ -138,8 +97,6 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 	}
 
 	c.cache.Set(requestId, file, 15*time.Minute)
-
-	ctx.SaveUploadedFile(rawFile, fullPath)
 	ctx.JSON(http.StatusCreated, file)
 }
 
@@ -167,18 +124,26 @@ func (c *FilesController) Download(ctx *gin.Context) {
 		return
 	}
 
-	// setting filename and informing clients to download
-	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%v\"", file.Name))
+	src, found, err := c.filesService.Download(id)
 
-	fullPath := filepath.Clean(filepath.Join(
-		c.config.RootPath,
-		file.UserId,
-		file.Location,
-		file.Name,
-	))
+	if err != nil || !found || src == nil {
+		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
+			Code:    http.StatusInternalServerError,
+			Message: "Internal server error",
+		})
+
+		return
+	}
+
+	defer src.Close()
+
+	extraHeaders := map[string]string{
+		"Content-Disposition": fmt.Sprintf("attachment; filename=\"%v\"", file.Name),
+	}
+	contentType := mime.TypeByExtension(filepath.Ext(file.Name))
 
 	// sending file
-	ctx.File(fullPath)
+	ctx.DataFromReader(http.StatusCreated, int64(file.Size), contentType, src, extraHeaders)
 }
 
 // GET /v1/files/:id
@@ -213,8 +178,8 @@ func (c *FilesController) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
 
 	var fields struct {
-		Filename string
-		Location string
+		Name        string
+		DirectoryId string
 	}
 
 	if err := ctx.ShouldBindJSON(&fields); err != nil {
@@ -228,8 +193,8 @@ func (c *FilesController) Update(ctx *gin.Context) {
 
 	updateDto := dtos.UpdateFileDto{}
 	updateDto.Where.Id = id
-	updateDto.Fields.Name = fields.Filename
-	updateDto.Fields.Location = fields.Location
+	updateDto.Fields.Name = fields.Name
+	updateDto.Fields.DirectoryId = fields.DirectoryId
 
 	file, updated, err := c.filesService.Update(updateDto)
 
@@ -258,7 +223,7 @@ func (c *FilesController) Update(ctx *gin.Context) {
 func (c *FilesController) Remove(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	file, removed, err := c.filesService.Remove(id)
+	removed, err := c.filesService.Remove(id)
 
 	if err != nil {
 		log.Print(err)
@@ -280,5 +245,5 @@ func (c *FilesController) Remove(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, file)
+	ctx.Status(http.StatusOK)
 }

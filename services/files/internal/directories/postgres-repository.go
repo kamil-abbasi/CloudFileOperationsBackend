@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/entities"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/interfaces"
 )
@@ -25,7 +24,9 @@ func NewPostgresRepository(config *config.Config, db *sql.DB) interfaces.IDirect
 func (repository *DirectoriesPostgresRepository) Find() ([]entities.Directory, error) {
 	var directories []entities.Directory
 
-	rows, err := repository.db.Query("SELECT * FROM directories")
+	rows, err := repository.db.Query(`
+		SELECT id, user_id, parent_id, name
+		FROM directories`)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find directories: %v", err)
@@ -35,11 +36,18 @@ func (repository *DirectoriesPostgresRepository) Find() ([]entities.Directory, e
 
 	for rows.Next() {
 		var directory entities.Directory
+		var parentId sql.NullString
 
-		err := rows.Scan(directory.Id, directory.Name, directory.Location, directory.UserId, directory.ParentId)
+		err := rows.Scan(&directory.Id, &directory.UserId, &parentId, &directory.Name)
 
 		if err != nil {
 			return nil, err
+		}
+
+		if parentId.Valid {
+			directory.ParentId = parentId.String
+		} else {
+			directory.ParentId = ""
 		}
 
 		directories = append(directories, directory)
@@ -53,40 +61,63 @@ func (repository *DirectoriesPostgresRepository) Find() ([]entities.Directory, e
 }
 
 func (repository *DirectoriesPostgresRepository) FindOne(id string) (entities.Directory, bool, error) {
-	var directory entities.Directory
+	if id == "" {
+		return entities.Directory{}, false, nil
+	}
 
-	err := repository.db.QueryRow("SELECT * FROM directories WHERE id = $1", id).Scan(&directory.Id, &directory.Name, &directory.Location, &directory.UserId, &directory.ParentId)
+	var directory entities.Directory
+	var parentId sql.NullString
+
+	err := repository.db.QueryRow(`
+		SELECT id, user_id, parent_id, name
+		FROM directories
+		WHERE id = $1`,
+		id).Scan(&directory.Id, &directory.UserId, &parentId, &directory.Name)
 
 	if err == sql.ErrNoRows {
 		return entities.Directory{}, false, nil
 	}
 
 	if err != nil {
-		return entities.Directory{}, false, fmt.Errorf("Failed to find one directory. Details: %v", err)
+		return entities.Directory{}, false, fmt.Errorf("Failed to find one file. Details: %v", err)
+	}
+
+	if parentId.Valid {
+		directory.ParentId = parentId.String
+	} else {
+		directory.ParentId = ""
 	}
 
 	return directory, true, nil
 }
 
-func (repository *DirectoriesPostgresRepository) Create(dto dtos.CreateDirectoryDto) (entities.Directory, error) {
+func (repository *DirectoriesPostgresRepository) Save(directory entities.Directory) error {
 	_, err := repository.db.Exec(
 		`INSERT INTO
-		directories(id, name, location, user_id, parent_id)
-		VALUES($1, $2, $3, $4, $5, $6)`,
-		dto.Id, dto.Name, dto.Location, dto.UserId, dto.UserId, dto.ParentId)
+		directories(id, user_id, parent_id, name)
+		VALUES($1, $2, $3, $4)
+		ON CONFLICT(id)
+		DO UPDATE SET
+			user_id = EXCLUDED.user_id,
+			parent_id = EXCLUDED.parent_id,
+			name = EXCLUDED.name
+		RETURNING id, user_id, parent_id, name`,
+		directory.Id, directory.UserId, &sql.NullString{
+			String: directory.ParentId,
+		}, directory.Name)
 
 	if err != nil {
-		return entities.Directory{}, fmt.Errorf("failed to create directory metadata, details: %v", err)
+		return fmt.Errorf("failed to save directory to postgres, details: %v", err)
 	}
 
-	return entities.Directory(dto), nil
+	return nil
 }
 
 func (repository *DirectoriesPostgresRepository) Remove(id string) (bool, error) {
 	result, err := repository.db.Exec("DELETE FROM directories WHERE id = $1", id)
 
 	if err != nil {
-		return false, fmt.Errorf("failed to remove directory metadata, details: %v", err)
+		return false, fmt.Errorf("failed to remove directory from postgres, details: %v", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
