@@ -107,7 +107,7 @@ There are 2 tables: files and directories. Each row in files table has `director
 
 ### Structure
 
-App service source code follows [SRP](https://www.geeksforgeeks.org/system-design/single-responsibility-in-solid-design-principle/) 3-layer architecture:
+App service source code follows [SRP](https://www.geeksforgeeks.org/system-design/single-responsibility-in-solid-design-principle/) and 3-layer architecture:
 
 - Presentation
 - Business logic
