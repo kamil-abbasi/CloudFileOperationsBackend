@@ -28,7 +28,7 @@ services:
       - ./services/app/internal:/usr/src/app/internal
       - app-data:/data
     env_file:
-      - ./services/files/.env
+      - ./services/app/.env
     healthcheck:
       test: ['CMD', './healthcheck']
       interval: 30s
