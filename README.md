@@ -26,6 +26,8 @@ This project is a backend for storing and managing files.
 
 [x] remove
 
+[] find direct items
+
 [] update (metadata only)
 
 [] find one (metadata only)
