@@ -113,11 +113,11 @@ App service source code follows [SRP](https://www.geeksforgeeks.org/system-desig
 - Business logic
 - Persistence
 
-Presentation layer consists of structs called `controllers`, which only take care about sending the right response to the user. They do NOT contain any business logic and call services (from business logic layer), which perform all operations. Example can be [FilesController](./services/files/internal/files/controller.go)
+Presentation layer consists of structs called `controllers`, which only take care about sending the right response to the user. They do NOT contain any business logic and call services (from business logic layer), which perform all operations. Example can be [FilesController](./services/app/internal/files/controller.go)
 
-Business logic layer has structs called `services`, which perform business logic and act as orchestrators (file upload, directory download etc). They may delegate more complex tasks to other structs or functions. Services do NOT deal with persistence, instead they use repositories for that (persistence layer). Example can be [FilesService](./services/files/internal/files/service.go)
+Business logic layer has structs called `services`, which perform business logic and act as orchestrators (file upload, directory download etc). They may delegate more complex tasks to other structs or functions. Services do NOT deal with persistence, instead they use repositories for that (persistence layer). Example can be [FilesService](./services/app/internal/files/service.go)
 
-Persistence layer deals with - as the name implies - data persistence. It mainly consists of structs called `repositories`, which are wrappers around SQL queries. This design makes it easier for above layers to persist data without needing to wory about database-specific details. Example can be [PostgresFilesRepository](./services/files/internal/files/postgres-repository.go)
+Persistence layer deals with - as the name implies - data persistence. It mainly consists of structs called `repositories`, which are wrappers around SQL queries. This design makes it easier for above layers to persist data without needing to wory about database-specific details. Example can be [PostgresFilesRepository](./services/app/internal/files/postgres-repository.go)
 
 ### Patterns
 
@@ -126,7 +126,7 @@ App service source code uses the following patterns for cleaner and more scalabl
 - [Dependency Injection](https://stackify.com/dependency-injection/)
 - [Dependency Inversion](https://stackify.com/dependency-inversion-principle/)
 
-Dependency injection is principle forces classes to accept their dependencies as parameters. In combination with dependency inversion this pattern enables developers to write code that is clean, readable, testable and scalable. Example of this pattern in code is [IFilesRepository](./services/files/internal/files/interfaces/respository.go).
+Dependency injection is principle forces classes to accept their dependencies as parameters. In combination with dependency inversion this pattern enables developers to write code that is clean, readable, testable and scalable. Example of this pattern in code is [IFilesRepository](./services/app/internal/files/interfaces/respository.go).
 
 # REST API
 
