@@ -2,60 +2,36 @@ package files
 
 import (
 	"io"
+	"path/filepath"
 
 	"github.com/google/uuid"
 	directoriesInterfaces "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/interfaces"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/entities"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/helpers"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
 type FilesService struct {
 	repository            interfaces.IFilesRepository
-	storageAdapter        shared.IStorageAdapter
+	storage               shared.IStorage
 	directoriesRepository directoriesInterfaces.IDirectoriesRepository
 }
 
-func NewService(repository interfaces.IFilesRepository, directoriesRepository directoriesInterfaces.IDirectoriesRepository, storageAdapter shared.IStorageAdapter) FilesService {
+func NewService(repository interfaces.IFilesRepository, directoriesRepository directoriesInterfaces.IDirectoriesRepository, storage shared.IStorage) FilesService {
 	return FilesService{
 		repository:            repository,
 		directoriesRepository: directoriesRepository,
-		storageAdapter:        storageAdapter,
+		storage:               storage,
 	}
 }
 
 func (s *FilesService) FindOne(id string) (entities.File, bool, error) {
-	file, found, err := s.repository.FindOne(id)
-
-	if err != nil {
-		return entities.File{}, false, err
-	}
-
-	if !found {
-		return entities.File{}, false, nil
-	}
-
-	return file, true, nil
+	return s.repository.FindOne(id)
 }
 
 func (s *FilesService) Download(id string) (io.ReadCloser, bool, error) {
-	file, found, err := s.repository.FindOne(id)
-
-	if err != nil {
-		return nil, false, err
-	}
-
-	if !found {
-		return nil, false, nil
-	}
-
-	key := helpers.GetFileKey(file)
-
-	src, err := s.storageAdapter.DownloadFile(key)
-
-	return src, true, nil
+	return s.storage.DownloadFile(id)
 }
 
 /*
@@ -65,8 +41,10 @@ shared.FileAlreadyExists
 */
 func (s *FilesService) Create(dto dtos.CreateFileDto, reader io.Reader) (entities.File, error) {
 	// if directory id is empty file will be in the root directory
+	location := "/"
+
 	if dto.DirectoryId != "" {
-		_, found, err := s.directoriesRepository.FindOne(dto.DirectoryId)
+		parentDir, found, err := s.directoriesRepository.FindOne(dto.DirectoryId)
 
 		if err != nil {
 			return entities.File{}, err
@@ -75,6 +53,8 @@ func (s *FilesService) Create(dto dtos.CreateFileDto, reader io.Reader) (entitie
 		if !found {
 			return entities.File{}, &shared.DirectoryNotFoundError{}
 		}
+
+		location = filepath.Clean(filepath.Join(parentDir.Location, parentDir.Name))
 	}
 
 	_, found, err := s.repository.FindByNameAndDirectoryId(dto.Name, dto.DirectoryId)
@@ -89,11 +69,10 @@ func (s *FilesService) Create(dto dtos.CreateFileDto, reader io.Reader) (entitie
 		DirectoryId: dto.DirectoryId,
 		Name:        dto.Name,
 		Size:        0,
+		Location:    location,
 	}
 
-	key := helpers.GetFileKey(file)
-
-	bytesWritten, err := s.storageAdapter.UploadFile(key, reader)
+	bytesWritten, err := s.storage.UploadFile(file.Id, reader)
 
 	file.Size = uint64(bytesWritten)
 
@@ -126,13 +105,14 @@ func (s *FilesService) Update(dto dtos.UpdateFileDto) (entities.File, bool, erro
 	}
 
 	if dto.Fields.DirectoryId != "" {
-		_, found, err = s.directoriesRepository.FindOne(file.DirectoryId)
+		dir, found, err := s.directoriesRepository.FindOne(file.DirectoryId)
 
 		if err != nil || !found {
 			return entities.File{}, false, err
 		}
 
 		file.DirectoryId = dto.Fields.DirectoryId
+		file.Location = filepath.Join(dir.Location, dir.Name)
 	}
 
 	file.Name = dto.Fields.Name
@@ -143,27 +123,19 @@ func (s *FilesService) Update(dto dtos.UpdateFileDto) (entities.File, bool, erro
 }
 
 func (s *FilesService) Remove(id string) (bool, error) {
-	file, found, err := s.repository.FindOne(id)
+	wasRemoved, err := s.repository.Remove(id)
 
 	if err != nil {
 		return false, err
 	}
 
-	if !found {
+	if !wasRemoved {
 		return false, nil
 	}
 
-	key := helpers.GetFileKey(file)
+	removed, err := s.storage.RemoveFile(id)
 
-	wasRemoved, err := s.storageAdapter.RemoveFile(key)
-
-	if err != nil || !wasRemoved {
-		return false, err
-	}
-
-	found, err = s.repository.Remove(id)
-
-	if err != nil || !found {
+	if !removed || err != nil {
 		return false, err
 	}
 

@@ -21,3 +21,11 @@ type DirectoryNotFoundError struct {
 func (e *DirectoryNotFoundError) Error() string {
 	return e.Err.Error()
 }
+
+type DirectoryAlreadyExistsError struct {
+	Err error
+}
+
+func (e *DirectoryAlreadyExistsError) Error() string {
+	return e.Err.Error()
+}

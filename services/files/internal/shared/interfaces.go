@@ -2,9 +2,9 @@ package shared
 
 import "io"
 
-type IStorageAdapter interface {
+type IStorage interface {
 	FileExists(key string) (bool, error)
 	UploadFile(key string, src io.Reader) (int64, error)
 	RemoveFile(key string) (bool, error)
-	DownloadFile(key string) (io.ReadCloser, error)
+	DownloadFile(key string) (io.ReadCloser, bool, error)
 }

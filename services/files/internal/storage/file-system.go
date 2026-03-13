@@ -14,7 +14,7 @@ type FileSystemStorageAdapter struct {
 	config *config.Config
 }
 
-func NewFileSystemStorageAdapter(config *config.Config) shared.IStorageAdapter {
+func NewFileSystemStorageAdapter(config *config.Config) shared.IStorage {
 	return &FileSystemStorageAdapter{
 		config: config,
 	}
@@ -56,16 +56,26 @@ func (storage *FileSystemStorageAdapter) UploadFile(key string, src io.Reader) (
 	return bytesWritten, nil
 }
 
-func (storage *FileSystemStorageAdapter) DownloadFile(key string) (io.ReadCloser, error) {
+func (storage *FileSystemStorageAdapter) DownloadFile(key string) (io.ReadCloser, bool, error) {
 	path := filepath.Clean(filepath.Join(storage.config.RootPath, key))
+
+	exists, err := shared.DoesFileExist(path)
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !exists {
+		return nil, false, nil
+	}
 
 	file, err := os.Open(path)
 
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return file, nil
+	return file, true, nil
 }
 
 func (storage *FileSystemStorageAdapter) RemoveFile(key string) (bool, error) {

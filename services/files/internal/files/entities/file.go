@@ -6,4 +6,5 @@ type File struct {
 	DirectoryId string
 	Name        string
 	Size        uint64
+	Location    string
 }

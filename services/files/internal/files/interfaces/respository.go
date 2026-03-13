@@ -7,6 +7,7 @@ import (
 
 type IFilesRepository interface {
 	Find(dto dtos.FindFilesDto) ([]entities.File, error)
+	FindByLocation(location string) ([]entities.File, error)
 	FindOne(id string) (entities.File, bool, error)
 	FindByNameAndDirectoryId(name string, directoryId string) (entities.File, bool, error)
 	Save(file entities.File) error

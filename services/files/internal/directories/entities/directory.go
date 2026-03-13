@@ -5,4 +5,5 @@ type Directory struct {
 	UserId   string
 	ParentId string
 	Name     string
+	Location string
 }

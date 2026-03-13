@@ -25,10 +25,23 @@ func NewPostgresRepository(config *config.Config, db *sql.DB) interfaces.IFilesR
 func (repository *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entities.File, error) {
 	var files []entities.File
 
+	var queryDirectoryId sql.NullString
+
+	if dto.Where.DirectoryId != "" {
+		queryDirectoryId = sql.NullString{
+			String: dto.Where.DirectoryId,
+			Valid:  true,
+		}
+	} else {
+		queryDirectoryId = sql.NullString{
+			Valid: false,
+		}
+	}
+
 	rows, err := repository.db.Query(`
-		SELECT id, user_id, directory_id, name, size
+		SELECT id, user_id, directory_id, name, size, location
 		FROM files
-		WHERE directory_id = $1`, dto.Where.DirectoryId)
+		WHERE directory_id = $1`, queryDirectoryId)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find files: %v", err)
@@ -40,7 +53,47 @@ func (repository *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entiti
 		var file entities.File
 		var directoryId sql.NullString
 
-		err := rows.Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size)
+		err := rows.Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size, &file.Location)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if directoryId.Valid {
+			file.DirectoryId = directoryId.String
+		} else {
+			file.DirectoryId = ""
+		}
+
+		files = append(files, file)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
+func (repository *FilesPostgresRepository) FindByLocation(location string) ([]entities.File, error) {
+	var files []entities.File
+
+	rows, err := repository.db.Query(`
+		SELECT id, user_id, directory_id, name, size, location
+		FROM files
+		WHERE location LIKE $1 || '%'`, location)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to find files: %v", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var file entities.File
+		var directoryId sql.NullString
+
+		err := rows.Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size, &file.Location)
 
 		if err != nil {
 			return nil, err
@@ -71,10 +124,10 @@ func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bo
 	var directoryId sql.NullString
 
 	err := repository.db.QueryRow(`
-		SELECT id, user_id, directory_id, name, size
+		SELECT id, user_id, directory_id, name, size, location
 		FROM files
 		WHERE id = $1`,
-		id).Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size)
+		id).Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size, &file.Location)
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
@@ -109,9 +162,9 @@ func (repository *FilesPostgresRepository) FindByNameAndDirectoryId(name string,
 	}
 
 	err := repository.db.QueryRow(`
-		SELECT id, user_id, directory_id, name, size
+		SELECT id, user_id, directory_id, name, size, location
 		FROM files
-		WHERE name = $1 AND directory_id IS NOT DISTINCT FROM $2`, name, queryDirId).Scan(&file.Id, &file.UserId, &dbDirectoryId, &file.Name, &file.Size)
+		WHERE name = $1 AND directory_id IS NOT DISTINCT FROM $2`, name, queryDirId).Scan(&file.Id, &file.UserId, &dbDirectoryId, &file.Name, &file.Size, &file.Location)
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
@@ -131,20 +184,30 @@ func (repository *FilesPostgresRepository) FindByNameAndDirectoryId(name string,
 }
 
 func (repository *FilesPostgresRepository) Save(file entities.File) error {
+	var directoryId sql.NullString
+
+	if file.DirectoryId != "" {
+		directoryId = sql.NullString{
+			String: file.DirectoryId,
+			Valid:  true,
+		}
+	} else {
+		directoryId = sql.NullString{Valid: false}
+	}
+
 	_, err := repository.db.Exec(
 		`INSERT INTO
-		files(id, user_id, directory_id, name, size)
-		VALUES($1, $2, $3, $4, $5)
+		files(id, user_id, directory_id, name, size, location)
+		VALUES($1, $2, $3, $4, $5, $6)
 		ON CONFLICT(id)
 		DO UPDATE SET
 			user_id = EXCLUDED.user_id,
 			directory_id = EXCLUDED.directory_id,
 			name = EXCLUDED.name,
-			size = EXCLUDED.size
-		RETURNING id, user_id, directory_id, name, size`,
-		file.Id, file.UserId, &sql.NullString{
-			String: file.DirectoryId,
-		}, file.Name, file.Size)
+			size = EXCLUDED.size,
+			location = EXCLUDED.location
+		RETURNING id, user_id, directory_id, name, size, location`,
+		file.Id, file.UserId, directoryId, file.Name, file.Size, file.Location)
 
 	if err != nil {
 		return fmt.Errorf("failed to save file to postgres, details: %v", err)

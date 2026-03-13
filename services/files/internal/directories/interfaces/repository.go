@@ -7,6 +7,7 @@ import (
 type IDirectoriesRepository interface {
 	Find() ([]entities.Directory, error)
 	FindOne(id string) (entities.Directory, bool, error)
+	FindByNameAndParentId(name string, parentId string) (entities.Directory, bool, error)
 	Save(directory entities.Directory) error
 	Remove(id string) (bool, error)
 }

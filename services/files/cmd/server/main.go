@@ -56,7 +56,7 @@ func Run() error {
 	directoriesRepository := directories.NewPostgresRepository(cfg, postgres)
 
 	filesService := files.NewService(filesRepository, directoriesRepository, storageAdapter)
-	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository)
+	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storageAdapter)
 
 	filesController := files.NewController(cfg, cache, &filesService)
 	directoriesController := directories.NewController(cfg, cache, &directoriesService)

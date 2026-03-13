@@ -1,118 +1,176 @@
 package directories
 
 import (
+	"archive/zip"
+	"fmt"
+	"io"
+	"log"
+	"path/filepath"
+	"strings"
+
+	"github.com/google/uuid"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/dtos"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/entities"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/interfaces"
 	fileInterfaces "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
 type DirectoriesService struct {
 	repository      interfaces.IDirectoriesRepository
 	config          *config.Config
 	filesRepository fileInterfaces.IFilesRepository
+	storage         shared.IStorage
 }
 
-func NewService(config *config.Config, repository interfaces.IDirectoriesRepository, filesRepository fileInterfaces.IFilesRepository) DirectoriesService {
+func NewService(config *config.Config, repository interfaces.IDirectoriesRepository, filesRepository fileInterfaces.IFilesRepository, storage shared.IStorage) DirectoriesService {
 	return DirectoriesService{
 		repository:      repository,
 		config:          config,
 		filesRepository: filesRepository,
+		storage:         storage,
 	}
 }
 
-// func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Directory, error) {
-// 	path := filepath.Clean(filepath.Join(s.config.RootPath, dto.UserId, dto.Location))
+func (s *DirectoriesService) FindOne(id string) (entities.Directory, bool, error) {
+	return s.repository.FindOne(id)
+}
 
-// 	err := os.MkdirAll(path, 0755)
+func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Directory, error) {
+	var parentId = ""
+	var location = "/"
 
-// 	if err != nil {
-// 		return entities.Directory{}, err
-// 	}
+	if dto.ParentId != "" {
+		_, found, err := s.repository.FindByNameAndParentId(dto.Name, dto.ParentId)
 
-// 	return entities.Directory(dto), nil
-// }
+		if err != nil {
+			return entities.Directory{}, err
+		}
 
-// func (s *DirectoriesService) Download(id string, writer io.Writer) error {
-// 	directory, found, err := s.repository.FindOne(id)
+		if found {
+			return entities.Directory{}, &shared.DirectoryAlreadyExistsError{}
+		}
 
-// 	if err != nil {
-// 		return err
-// 	}
+		parentDir, found, err := s.repository.FindOne(dto.ParentId)
 
-// 	if !found {
-// 		return nil
-// 	}
+		if err != nil {
+			return entities.Directory{}, err
+		}
 
-// 	findDto := fileDtos.FindFilesDto{}
-// 	findDto.Where.DirectoryId = id
+		if !found {
+			return entities.Directory{}, &shared.DirectoryNotFoundError{}
+		}
 
-// 	files, err := s.filesRepository.Find(findDto)
+		parentId = parentDir.Id
+		location = filepath.Join(parentDir.Location, parentDir.Name)
+	}
 
-// 	if err != nil {
-// 		return err
-// 	}
+	log.Printf("location: %v", location)
 
-// 	zipWriter := zip.NewWriter(writer)
-// 	defer zipWriter.Close()
+	directory := entities.Directory{
+		Id:       uuid.NewString(),
+		UserId:   dto.UserId,
+		ParentId: parentId,
+		Name:     dto.Name,
+		Location: filepath.Clean(location),
+	}
 
-// 	for _, file := range files {
-// 		fullPath := filepath.Clean(filepath.Join(s.config.RootPath, file.UserId, file.Location, file.Name))
+	err := s.repository.Save(directory)
 
-// 		// relative path inside ZIP based on location prefix
-// 		relativePath := filepath.Join(file.Location, file.Name)
+	if err != nil {
+		return entities.Directory{}, err
+	}
 
-// 		if len(directory.Location) > 0 {
-// 			rel, err := filepath.Rel(directory.Location, relativePath)
+	return directory, nil
+}
 
-// 			if err == nil {
-// 				relativePath = rel
-// 			}
-// 		}
+// not implemented
+func (s *DirectoriesService) Update(dto dtos.UpdateDirectoryDto) (entities.Directory, bool, error) {
+	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
+}
 
-// 		srcFile, err := os.Open(fullPath)
+func (s *DirectoriesService) Remove(id string) (bool, error) {
+	dir, found, err := s.repository.FindOne(id)
 
-// 		if err != nil {
-// 			return fmt.Errorf("error while opening file %v: %v", fullPath, err)
-// 		}
+	if err != nil {
+		return false, err
+	}
 
-// 		zipEntry, err := zipWriter.Create(relativePath)
+	if !found {
+		return false, nil
+	}
 
-// 		if err != nil {
-// 			srcFile.Close()
-// 			return fmt.Errorf("error while creating zip entry: %v", err)
-// 		}
+	files, err := s.filesRepository.FindByLocation(filepath.Join(dir.Location, dir.Name))
 
-// 		_, err = io.Copy(zipEntry, srcFile)
-// 		srcFile.Close()
+	if err != nil {
+		return false, err
+	}
 
-// 		if err != nil {
-// 			return fmt.Errorf("error while writing to zip: %v", err)
-// 		}
-// 	}
+	for _, file := range files {
+		s.storage.RemoveFile(file.Id)
+	}
 
-// 	return nil
-// }
+	_, err = s.repository.Remove(id)
 
-// func (s *DirectoriesService) Remove(id string) (bool, error) {
-// 	directory, found, err := s.repository.FindOne(id)
+	if err != nil {
+		return false, err
+	}
 
-// 	if !found {
-// 		return false, nil
-// 	}
+	return true, nil
+}
 
-// 	if err != nil {
-// 		return false, err
-// 	}
+func (s *DirectoriesService) Download(id string, writer io.Writer) (bool, error) {
+	directory, found, err := s.repository.FindOne(id)
 
-// 	path := filepath.Clean(filepath.Join(s.config.RootPath, directory.UserId, directory.Location))
+	if err != nil {
+		return false, err
+	}
 
-// 	err = os.RemoveAll(path)
+	if !found {
+		return false, nil
+	}
 
-// 	if err != nil {
-// 		return false, err
-// 	}
+	files, err := s.filesRepository.FindByLocation(filepath.Join(directory.Location, directory.Name))
 
-// 	s.repository.Remove(id)
+	if err != nil {
+		return false, err
+	}
 
-// 	return true, nil
-// }
+	zipWriter := zip.NewWriter(writer)
+	defer zipWriter.Close()
+
+	// base path for every file in the directory
+	basePath := filepath.Join(directory.Location, directory.Name) + string(filepath.Separator)
+
+	for _, file := range files {
+
+		fullFilePath := filepath.Join(file.Location, file.Name)
+		relativePath := strings.TrimPrefix(fullFilePath, basePath)
+		relativePath = filepath.ToSlash(relativePath)
+
+		f, err := zipWriter.Create(relativePath)
+
+		// TODO: handle error properly
+		if err != nil {
+			return false, err
+		}
+
+		readCloser, found, err := s.storage.DownloadFile(file.Id)
+
+		// TODO: handle error properly
+		if err != nil || !found {
+			return false, err
+		}
+
+		_, err = io.Copy(f, readCloser)
+
+		readCloser.Close()
+
+		if err != nil {
+			return false, err
+		}
+	}
+
+	return true, nil
+}

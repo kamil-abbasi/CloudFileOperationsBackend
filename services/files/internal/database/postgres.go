@@ -35,6 +35,7 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 			user_id TEXT NOT NULL,
 			parent_id UUID,
 			name TEXT NOT NULL,
+			location TEXT NOT NULL,
 			FOREIGN KEY (parent_id)
 				REFERENCES directories(id)
 				ON DELETE CASCADE
@@ -48,8 +49,10 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 			directory_id UUID,
 			name TEXT NOT NULL,
 			size INTEGER NOT NULL,
+			location TEXT NOT NULL,
 			FOREIGN KEY(directory_id)
 				REFERENCES directories(id)
+				ON DELETE CASCADE
 		)
 	`
 
