@@ -88,6 +88,17 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 			return
 		}
 
+		_, ok = err.(*shared.DirectoryNotFoundError)
+
+		if ok {
+			ctx.JSON(http.StatusNotFound, &shared.HttpError{
+				Code:    http.StatusNotFound,
+				Message: "Directory not found",
+			})
+
+			return
+		}
+
 		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",
