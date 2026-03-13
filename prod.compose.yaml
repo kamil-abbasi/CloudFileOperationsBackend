@@ -8,17 +8,51 @@ services:
     ports:
       - 8080:80
     depends_on:
-      files:
+      app:
         condition: service_healthy
-  files:
+  app:
     build:
-      context: ./services/files
+      context: ./services/app
       target: prod
     env_file:
-      - ./services/files/.env
+      - ./services/app/.env
     healthcheck:
       test: ['CMD', './healthcheck']
       interval: 30s
       timeout: 30s
       retries: 5
       start_period: 10s
+    depends_on:
+      database:
+        condition: service_healthy
+      file-storage:
+        condition: service_healthy
+        
+  file-storage:
+    build:
+      context: ./services/file-storage
+    restart: always
+    env_file:
+      - ./services/file-storage/.env
+    volumes:
+      - file-storage-data:/data
+    healthcheck:
+      test: ['CMD', "curl", "-I", "http://localhost:8333/healthz"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  database:
+    build:
+      context: ./services/database
+    restart: always
+    env_file:
+      - ./services/database/.env
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD', 'pg_isready']
+      timeout: 30s
+      retries: 5
+      start_period: 20s

@@ -16,17 +16,17 @@ services:
     ports:
       - 8080:80
     depends_on:
-      files:
+      app:
         condition: service_healthy
-  files:
+  app:
     restart: always
     build:
-      context: ./services/files
+      context: ./services/app
       target: dev
     volumes:
-      - ./services/files/cmd:/usr/src/app/cmd
-      - ./services/files/internal:/usr/src/app/internal
-      - files-data:/data
+      - ./services/app/cmd:/usr/src/app/cmd
+      - ./services/app/internal:/usr/src/app/internal
+      - app-data:/data
     env_file:
       - ./services/files/.env
     healthcheck:
@@ -70,6 +70,6 @@ services:
       retries: 5
       start_period: 20s
 volumes:
-  files-data:
+  app-data:
   db-data:
   file-storage-data:
