@@ -31,9 +31,15 @@ func NewRouter(filesController *files.FilesController, directoriesController *di
 		{
 			directoriesRouter.GET("/:id/download", directoriesController.Download)
 
+			directoriesRouter.GET("/:id", directoriesController.FindOne)
+
+			directoriesRouter.PATCH("/:id", directoriesController.Update)
+
 			directoriesRouter.POST("", directoriesController.Create)
 
 			directoriesRouter.DELETE("/:id", directoriesController.Remove)
+
+			directoriesRouter.GET("/items", directoriesController.ListItems)
 		}
 	}
 

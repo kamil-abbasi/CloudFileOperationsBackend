@@ -21,6 +21,44 @@ func NewPostgresRepository(config *config.Config, db *sql.DB) interfaces.IDirect
 	}
 }
 
+func (repository *DirectoriesPostgresRepository) ListItems(location string) ([]entities.DirectoryItem, error) {
+	var items []entities.DirectoryItem
+
+	rows, err := repository.db.Query(`
+		SELECT id, name, user_id, 'directory' AS type
+		FROM directories
+		WHERE location = $1
+		UNION
+		SELECT id, name, user_id, 'file' AS type
+		FROM files
+		WHERE location = $1
+		`, location)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to find directory items: %v", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var item entities.DirectoryItem
+
+		err := rows.Scan(&item.Id, &item.Name, &item.UserId, &item.Type)
+
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
 func (repository *DirectoriesPostgresRepository) Find() ([]entities.Directory, error) {
 	var directories []entities.Directory
 
@@ -141,7 +179,15 @@ func (repository *DirectoriesPostgresRepository) Save(directory entities.Directo
 		parentId = sql.NullString{Valid: false}
 	}
 
-	_, err := repository.db.Exec(
+	tx, err := repository.db.Begin()
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	_, err = repository.db.Exec(
 		`INSERT INTO
 		directories(id, user_id, parent_id, name, location)
 		VALUES($1, $2, $3, $4, $5)
@@ -150,19 +196,39 @@ func (repository *DirectoriesPostgresRepository) Save(directory entities.Directo
 			user_id = EXCLUDED.user_id,
 			parent_id = EXCLUDED.parent_id,
 			name = EXCLUDED.name,
-			location = EXCLUDED.location
-		RETURNING id, user_id, parent_id, name`,
+			location = EXCLUDED.location`,
 		directory.Id, directory.UserId, parentId, directory.Name, directory.Location)
+
+	_, err = tx.Exec(`
+		INSERT INTO
+		directory_items(id, user_id, type)
+		VALUES($1, $2, 'directory')
+		ON CONFLICT(id)
+		DO NOTHING
+	`, directory.Id, directory.UserId)
 
 	if err != nil {
 		return fmt.Errorf("failed to save directory to postgres, details: %v", err)
 	}
 
+	tx.Commit()
+
 	return nil
 }
 
 func (repository *DirectoriesPostgresRepository) Remove(id string) (bool, error) {
-	result, err := repository.db.Exec("DELETE FROM directories WHERE id = $1", id)
+	tx, err := repository.db.Begin()
+
+	if err != nil {
+		return false, err
+	}
+
+	defer tx.Rollback()
+
+	result, err := tx.Exec("DELETE FROM directories WHERE id = $1", id)
+	_, err = tx.Exec(`
+		DELETE FROM directory_items
+		WHERE id = $1 AND type = 'directory'`, id)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove directory from postgres, details: %v", err)
@@ -173,6 +239,8 @@ func (repository *DirectoriesPostgresRepository) Remove(id string) (bool, error)
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch the number of deleted rows: %v", err)
 	}
+
+	tx.Commit()
 
 	if rowsAffected <= 0 {
 		return false, nil

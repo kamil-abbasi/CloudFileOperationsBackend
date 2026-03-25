@@ -99,6 +99,8 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 			return
 		}
 
+		log.Print(err)
+
 		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
 			Code:    http.StatusInternalServerError,
 			Message: "Internal server error",

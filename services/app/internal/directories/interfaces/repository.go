@@ -5,6 +5,7 @@ import (
 )
 
 type IDirectoriesRepository interface {
+	ListItems(location string) ([]entities.DirectoryItem, error)
 	Find() ([]entities.Directory, error)
 	FindOne(id string) (entities.Directory, bool, error)
 	FindByNameAndParentId(name string, parentId string) (entities.Directory, bool, error)

@@ -56,8 +56,22 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 		)
 	`
 
+	createItemTypeEnumStatement := `
+		CREATE TYPE item_type AS ENUM('file', 'directory')
+	`
+
+	createDirectoryItemsTableStatement := `
+		CREATE TABLE IF NOT EXISTS directory_items (
+			id UUID NOT NULL PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			type item_type NOT NULL
+		)
+	`
+
 	_, err = db.Exec(createDirectoriesTableStatement)
 	_, err = db.Exec(createFilesTableStatement)
+	_, err = db.Exec(createItemTypeEnumStatement)
+	_, err = db.Exec(createDirectoryItemsTableStatement)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create tables, details: %v", err)

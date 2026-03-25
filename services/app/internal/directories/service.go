@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -31,6 +30,10 @@ func NewService(config *config.Config, repository interfaces.IDirectoriesReposit
 		filesRepository: filesRepository,
 		storage:         storage,
 	}
+}
+
+func (s *DirectoriesService) ListItems(location string) ([]entities.DirectoryItem, error) {
+	return s.repository.ListItems(location)
 }
 
 func (s *DirectoriesService) FindOne(id string) (entities.Directory, bool, error) {
@@ -66,8 +69,6 @@ func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Direc
 		location = filepath.Join(parentDir.Location, parentDir.Name)
 	}
 
-	log.Printf("location: %v", location)
-
 	directory := entities.Directory{
 		Id:       uuid.NewString(),
 		UserId:   dto.UserId,
@@ -87,6 +88,36 @@ func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Direc
 
 // not implemented
 func (s *DirectoriesService) Update(dto dtos.UpdateDirectoryDto) (entities.Directory, bool, error) {
+	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
+}
+
+// not implemented
+func (s *DirectoriesService) Rename(id string, newName string) (entities.Directory, bool, error) {
+	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
+
+	directory, found, err := s.repository.FindOne(id)
+
+	if err != nil {
+		return entities.Directory{}, false, err
+	}
+
+	if !found {
+		return entities.Directory{}, false, nil
+	}
+
+	location := directory.Location
+	newLocation := filepath.Join(filepath.Dir(location), newName)
+
+	directory.Location = newLocation
+	directory.Name = newName
+
+	s.repository.Save(directory)
+
+	return directory, true, nil
+}
+
+// not implemented
+func (s *DirectoriesService) Move(id string, parentId string) (entities.Directory, bool, error) {
 	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
 }
 

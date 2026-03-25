@@ -195,7 +195,15 @@ func (repository *FilesPostgresRepository) Save(file entities.File) error {
 		directoryId = sql.NullString{Valid: false}
 	}
 
-	_, err := repository.db.Exec(
+	tx, err := repository.db.Begin()
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	_, err = tx.Exec(
 		`INSERT INTO
 		files(id, user_id, directory_id, name, size, location)
 		VALUES($1, $2, $3, $4, $5, $6)
@@ -205,19 +213,43 @@ func (repository *FilesPostgresRepository) Save(file entities.File) error {
 			directory_id = EXCLUDED.directory_id,
 			name = EXCLUDED.name,
 			size = EXCLUDED.size,
-			location = EXCLUDED.location
-		RETURNING id, user_id, directory_id, name, size, location`,
+			location = EXCLUDED.location`,
 		file.Id, file.UserId, directoryId, file.Name, file.Size, file.Location)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO
+		directory_items(id, user_id, type)
+		VALUES($1, $2, 'file')
+		ON CONFLICT(id)
+		DO NOTHING
+	`, file.Id, file.UserId)
 
 	if err != nil {
 		return fmt.Errorf("failed to save file to postgres, details: %v", err)
 	}
 
+	tx.Commit()
+
 	return nil
 }
 
 func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
-	result, err := repository.db.Exec("DELETE FROM files WHERE id = $1", id)
+	tx, err := repository.db.Begin()
+
+	if err != nil {
+		return false, err
+	}
+
+	defer tx.Rollback()
+
+	result, err := tx.Exec("DELETE FROM files WHERE id = $1", id)
+	_, err = tx.Exec(`
+		DELETE FROM directory_items
+		WHERE id = $1 AND type = "file"`, id)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove file from postgres, details: %v", err)
@@ -228,6 +260,8 @@ func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch the number of deleted rows: %v", err)
 	}
+
+	tx.Commit()
 
 	if rowsAffected <= 0 {
 		return false, nil

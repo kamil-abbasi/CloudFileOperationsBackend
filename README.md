@@ -16,6 +16,10 @@ This project is a backend for storing and managing files.
 
 [x] update (metadata only)
 
+[] move
+
+[x] rename
+
 ## Directories
 
 [] upload
@@ -26,21 +30,21 @@ This project is a backend for storing and managing files.
 
 [x] remove
 
-[] find direct items
+[] rename
+
+[] move
+
+[x] list items
 
 [] update (metadata only)
 
-[] find one (metadata only)
+[x] find one (metadata only)
 
 ## Usage
 
-[x] for one file
+[x] for file
 
-[] for one directory
-
-[] for all files of specific user
-
-[] quotas
+[] for directory
 
 ## Authn & Authz
 
