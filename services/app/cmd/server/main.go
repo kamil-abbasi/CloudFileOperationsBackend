@@ -12,6 +12,7 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/storage"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/usage"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -57,11 +58,13 @@ func Run() error {
 
 	filesService := files.NewService(filesRepository, directoriesRepository, storageAdapter)
 	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storageAdapter)
+	usageService := usage.NewService(&filesService)
 
 	filesController := files.NewController(cfg, cache, &filesService)
 	directoriesController := directories.NewController(cfg, cache, &directoriesService)
+	usageController := usage.NewController(&usageService)
 
-	r := api.NewRouter(&filesController, &directoriesController)
+	r := api.NewRouter(&filesController, &directoriesController, &usageController)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 

@@ -5,9 +5,10 @@ import (
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/usage"
 )
 
-func NewRouter(filesController *files.FilesController, directoriesController *directories.DirectoriesController) *gin.Engine {
+func NewRouter(filesController *files.FilesController, directoriesController *directories.DirectoriesController, usageController *usage.UsageController) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/healthcheck")
@@ -40,6 +41,11 @@ func NewRouter(filesController *files.FilesController, directoriesController *di
 			directoriesRouter.DELETE("/:id", directoriesController.Remove)
 
 			directoriesRouter.GET("/items", directoriesController.ListItems)
+		}
+
+		usageRouter := v1.Group("/usage")
+		{
+			usageRouter.GET("", usageController.CalculateForLocation)
 		}
 	}
 

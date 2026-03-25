@@ -26,6 +26,10 @@ func NewService(repository interfaces.IFilesRepository, directoriesRepository di
 	}
 }
 
+func (s *FilesService) FindByLocation(location string) ([]entities.File, error) {
+	return s.repository.FindByLocation(location)
+}
+
 func (s *FilesService) FindOne(id string) (entities.File, bool, error) {
 	return s.repository.FindOne(id)
 }

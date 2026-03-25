@@ -44,7 +44,7 @@ This project is a backend for storing and managing files.
 
 [x] for file
 
-[] for directory
+[x] for directory
 
 ## Authn & Authz
 
