@@ -7,5 +7,5 @@ type RegisterUserDto struct {
 }
 
 type RegisterUserResponseDto struct {
-	Id string
+	Id string `json:"id"`
 }

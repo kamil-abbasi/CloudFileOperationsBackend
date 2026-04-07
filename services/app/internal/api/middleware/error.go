@@ -42,6 +42,11 @@ func Error() gin.HandlerFunc {
 					Code:    http.StatusNotFound,
 					Message: "File not found",
 				})
+			} else if errors.Is(actualErr, files.ErrDirectoryNotFound) {
+				ctx.JSON(http.StatusNotFound, &shared.HttpError{
+					Code:    http.StatusNotFound,
+					Message: "Directory not found",
+				})
 			} else if errors.Is(actualErr, directories.ErrAlreadyExists) {
 				ctx.JSON(http.StatusConflict, &shared.HttpError{
 					Code:    http.StatusConflict,

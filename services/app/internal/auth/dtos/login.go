@@ -6,5 +6,5 @@ type LoginUserDto struct {
 }
 
 type LoginUserResponseDto struct {
-	Token string
+	Token string `json:"token"`
 }

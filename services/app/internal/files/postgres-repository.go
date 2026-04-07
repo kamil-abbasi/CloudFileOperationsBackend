@@ -1,115 +1,58 @@
 package files
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"math"
 
+	"github.com/google/uuid"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/entities"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/pkg"
 )
 
 type FilesPostgresRepository struct {
-	db *sql.DB
+	db      *sql.DB
+	queries *database.Queries
 }
 
-func NewPostgresRepository(db *sql.DB) interfaces.IFilesRepository {
+func NewPostgresRepository(db *sql.DB, queries *database.Queries) IFilesRepository {
 	return &FilesPostgresRepository{
-		db: db,
+		db:      db,
+		queries: queries,
 	}
 }
 
 func (repository *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entities.File, error) {
-	var files []entities.File
-
-	var queryDirectoryId sql.NullString
-
-	if dto.Where.DirectoryId != "" {
-		queryDirectoryId = sql.NullString{
-			String: dto.Where.DirectoryId,
-			Valid:  true,
-		}
-	} else {
-		queryDirectoryId = sql.NullString{
-			Valid: false,
-		}
-	}
-
-	rows, err := repository.db.Query(`
-		SELECT id, user_id, directory_id, name, size, location
-		FROM files
-		WHERE directory_id = $1`, queryDirectoryId)
+	directoryID, err := parseOptionalUUID(dto.Where.DirectoryId)
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find files: %v", err)
+		return nil, fmt.Errorf("failed to parse directory id, details: %v", err)
 	}
 
-	defer rows.Close()
+	files, err := repository.queries.FindFiles(context.Background(), directoryID)
 
-	for rows.Next() {
-		var file entities.File
-		var directoryId sql.NullString
-
-		err := rows.Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size, &file.Location)
-
-		if err != nil {
-			return nil, err
-		}
-
-		if directoryId.Valid {
-			file.DirectoryId = directoryId.String
-		} else {
-			file.DirectoryId = ""
-		}
-
-		files = append(files, file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find files: %v", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
+	result := pkg.SliceMap(files, DatabaseToEntity)
 
-	return files, nil
+	return result, nil
 }
 
 func (repository *FilesPostgresRepository) FindByLocation(location string) ([]entities.File, error) {
-	var files []entities.File
-
-	rows, err := repository.db.Query(`
-		SELECT id, user_id, directory_id, name, size, location
-		FROM files
-		WHERE location LIKE $1 || '%'`, location)
+	files, err := repository.queries.FindFilesByLocation(context.Background(), sql.NullString{String: location, Valid: true})
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find files: %v", err)
+		return nil, fmt.Errorf("failed to find files: %v", err)
 	}
 
-	defer rows.Close()
+	result := pkg.SliceMap(files, DatabaseToEntity)
 
-	for rows.Next() {
-		var file entities.File
-		var directoryId sql.NullString
-
-		err := rows.Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size, &file.Location)
-
-		if err != nil {
-			return nil, err
-		}
-
-		if directoryId.Valid {
-			file.DirectoryId = directoryId.String
-		} else {
-			file.DirectoryId = ""
-		}
-
-		files = append(files, file)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return files, nil
+	return result, nil
 }
 
 func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bool, error) {
@@ -117,82 +60,74 @@ func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bo
 		return entities.File{}, false, nil
 	}
 
-	var file entities.File
-	var directoryId sql.NullString
+	fileID, err := uuid.Parse(id)
 
-	err := repository.db.QueryRow(`
-		SELECT id, user_id, directory_id, name, size, location
-		FROM files
-		WHERE id = $1`,
-		id).Scan(&file.Id, &file.UserId, &directoryId, &file.Name, &file.Size, &file.Location)
+	if err != nil {
+		return entities.File{}, false, fmt.Errorf("failed to parse file id, details: %v", err)
+	}
+
+	file, err := repository.queries.FindFileById(context.Background(), fileID)
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
 	}
 
 	if err != nil {
-		return entities.File{}, false, fmt.Errorf("Failed to find one file. Details: %v", err)
+		return entities.File{}, false, fmt.Errorf("failed to find one file, details: %v", err)
 	}
 
-	if directoryId.Valid {
-		file.DirectoryId = directoryId.String
-	} else {
-		file.DirectoryId = ""
-	}
-
-	return file, true, nil
+	return DatabaseToEntity(file), true, nil
 }
 
 func (repository *FilesPostgresRepository) FindByNameAndDirectoryId(name string, directoryId string) (entities.File, bool, error) {
-	var file entities.File
-	var dbDirectoryId sql.NullString
+	queryDirID, err := parseOptionalUUID(directoryId)
 
-	var queryDirId sql.NullString
-
-	if directoryId != "" {
-		queryDirId = sql.NullString{
-			String: directoryId,
-			Valid:  true,
-		}
-	} else {
-		queryDirId = sql.NullString{Valid: false}
+	if err != nil {
+		return entities.File{}, false, fmt.Errorf("failed to parse directory id, details: %v", err)
 	}
 
-	err := repository.db.QueryRow(`
-		SELECT id, user_id, directory_id, name, size, location
-		FROM files
-		WHERE name = $1 AND directory_id IS NOT DISTINCT FROM $2`, name, queryDirId).Scan(&file.Id, &file.UserId, &dbDirectoryId, &file.Name, &file.Size, &file.Location)
+	file, err := repository.queries.FindFileByNameAndDirectoryId(context.Background(), database.FindFileByNameAndDirectoryIdParams{
+		Name:        name,
+		DirectoryID: queryDirID,
+	})
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
 	}
 
 	if err != nil {
-		return entities.File{}, false, fmt.Errorf("Failed to find file by name and directory id. Details: %v", err)
+		return entities.File{}, false, fmt.Errorf("failed to find file by name and directory id, details: %v", err)
 	}
 
-	if dbDirectoryId.Valid {
-		file.DirectoryId = dbDirectoryId.String
-	} else {
-		file.DirectoryId = ""
-	}
-
-	return file, true, nil
+	return DatabaseToEntity(file), true, nil
 }
 
 func (repository *FilesPostgresRepository) Save(file entities.File) error {
-	var directoryId sql.NullString
+	fileID, err := uuid.Parse(file.Id)
 
-	if file.DirectoryId != "" {
-		directoryId = sql.NullString{
-			String: file.DirectoryId,
-			Valid:  true,
-		}
-	} else {
-		directoryId = sql.NullString{Valid: false}
+	if err != nil {
+		return fmt.Errorf("failed to parse file id, details: %v", err)
 	}
 
-	tx, err := repository.db.Begin()
+	userID, err := uuid.Parse(file.UserId)
+
+	if err != nil {
+		return fmt.Errorf("failed to parse user id, details: %v", err)
+	}
+
+	directoryID, err := parseOptionalUUID(file.DirectoryId)
+
+	if err != nil {
+		return fmt.Errorf("failed to parse directory id, details: %v", err)
+	}
+
+	if file.Size > math.MaxInt32 {
+		return fmt.Errorf("failed to save file to postgres, details: file size exceeds postgres integer max")
+	}
+
+	ctx := context.Background()
+
+	tx, err := repository.db.BeginTx(ctx, nil)
 
 	if err != nil {
 		return err
@@ -200,42 +135,49 @@ func (repository *FilesPostgresRepository) Save(file entities.File) error {
 
 	defer tx.Rollback()
 
-	_, err = tx.Exec(
-		`INSERT INTO
-		files(id, user_id, directory_id, name, size, location)
-		VALUES($1, $2, $3, $4, $5, $6)
-		ON CONFLICT(id)
-		DO UPDATE SET
-			user_id = EXCLUDED.user_id,
-			directory_id = EXCLUDED.directory_id,
-			name = EXCLUDED.name,
-			size = EXCLUDED.size,
-			location = EXCLUDED.location`,
-		file.Id, file.UserId, directoryId, file.Name, file.Size, file.Location)
+	queries := repository.queries.WithTx(tx)
 
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(`
-		INSERT INTO
-		directory_items(id, user_id, type)
-		VALUES($1, $2, 'file')
-		ON CONFLICT(id)
-		DO NOTHING
-	`, file.Id, file.UserId)
+	err = queries.SaveFile(ctx, database.SaveFileParams{
+		ID:          fileID,
+		UserID:      userID,
+		DirectoryID: directoryID,
+		Name:        file.Name,
+		Size:        int32(file.Size),
+		Location:    file.Location,
+	})
 
 	if err != nil {
 		return fmt.Errorf("failed to save file to postgres, details: %v", err)
 	}
 
-	tx.Commit()
+	err = queries.SaveFileItem(ctx, database.SaveFileItemParams{
+		ID:     fileID,
+		UserID: userID,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to save file to postgres, details: %v", err)
+	}
+
+	err = tx.Commit()
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
-	tx, err := repository.db.Begin()
+	fileID, err := uuid.Parse(id)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to parse file id, details: %v", err)
+	}
+
+	ctx := context.Background()
+
+	tx, err := repository.db.BeginTx(ctx, nil)
 
 	if err != nil {
 		return false, err
@@ -243,26 +185,43 @@ func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
 
 	defer tx.Rollback()
 
-	result, err := tx.Exec("DELETE FROM files WHERE id = $1", id)
-	_, err = tx.Exec(`
-		DELETE FROM directory_items
-		WHERE id = $1 AND type = 'file'`, id)
+	queries := repository.queries.WithTx(tx)
+
+	rowsAffected, err := queries.RemoveFileRows(ctx, fileID)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove file from postgres, details: %v", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	err = queries.RemoveFileItem(ctx, fileID)
 
 	if err != nil {
-		return false, fmt.Errorf("failed to fetch the number of deleted rows: %v", err)
+		return false, fmt.Errorf("failed to remove file from postgres, details: %v", err)
 	}
 
-	tx.Commit()
+	err = tx.Commit()
+
+	if err != nil {
+		return false, err
+	}
 
 	if rowsAffected <= 0 {
 		return false, nil
 	}
 
 	return true, nil
+}
+
+func parseOptionalUUID(value string) (uuid.NullUUID, error) {
+	if value == "" {
+		return uuid.NullUUID{Valid: false}, nil
+	}
+
+	parsedUUID, err := uuid.Parse(value)
+
+	if err != nil {
+		return uuid.NullUUID{}, err
+	}
+
+	return uuid.NullUUID{UUID: parsedUUID, Valid: true}, nil
 }

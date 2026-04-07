@@ -1,20 +1,25 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/auth/entities"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/auth/interfaces"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 )
 
 type PostgresUsersRepository struct {
-	db *sql.DB
+	db      *sql.DB
+	queries *database.Queries
 }
 
-func NewPostgresRepository(db *sql.DB) interfaces.IUsersRepository {
+func NewPostgresRepository(db *sql.DB, queries *database.Queries) interfaces.IUsersRepository {
 	return &PostgresUsersRepository{
-		db: db,
+		db:      db,
+		queries: queries,
 	}
 }
 
@@ -23,13 +28,7 @@ func (r *PostgresUsersRepository) FindByName(name string) (entities.User, bool, 
 		return entities.User{}, false, nil
 	}
 
-	var user entities.User
-
-	err := r.db.QueryRow(`
-		SELECT id, name, password_hash
-		FROM users
-		WHERE name = $1
-	`, name).Scan(&user.Id, &user.Name, &user.PasswordHash)
+	user, err := r.queries.FindUserByName(context.Background(), name)
 
 	if err == sql.ErrNoRows {
 		return entities.User{}, false, nil
@@ -39,17 +38,25 @@ func (r *PostgresUsersRepository) FindByName(name string) (entities.User, bool, 
 		return entities.User{}, false, fmt.Errorf("failed to find user by name, details: %v", err)
 	}
 
-	return user, true, nil
+	return entities.User{
+		Id:           user.ID.String(),
+		Name:         user.Name,
+		PasswordHash: user.PasswordHash,
+	}, true, nil
 }
 
 func (r *PostgresUsersRepository) Save(entity entities.User) error {
-	_, err := r.db.Exec(`
-		INSERT INTO users(id, name, password_hash)
-		VALUES($1, $2, $3)
-		ON CONFLICT(id)
-		DO UPDATE SET
-			name = EXCLUDED.name
-	`, entity.Id, entity.Name, entity.PasswordHash)
+	userID, err := uuid.Parse(entity.Id)
+
+	if err != nil {
+		return fmt.Errorf("failed to parse user id, details: %v", err)
+	}
+
+	err = r.queries.SaveUser(context.Background(), database.SaveUserParams{
+		ID:           userID,
+		Name:         entity.Name,
+		PasswordHash: entity.PasswordHash,
+	})
 
 	if err != nil {
 		return fmt.Errorf("failed to save user to postgres, details: %v", err)
@@ -63,16 +70,16 @@ func (r *PostgresUsersRepository) Remove(id string) (bool, error) {
 		return false, nil
 	}
 
-	result, err := r.db.Exec("DELETE FROM users WHERE id = $1", id)
+	userID, err := uuid.Parse(id)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to parse user id, details: %v", err)
+	}
+
+	rowsAffected, err := r.queries.RemoveUserRows(context.Background(), userID)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove user from postgres, details: %v", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-
-	if err != nil {
-		return false, fmt.Errorf("failed to fetch the number of deleted rows: %v", err)
 	}
 
 	if rowsAffected <= 0 {

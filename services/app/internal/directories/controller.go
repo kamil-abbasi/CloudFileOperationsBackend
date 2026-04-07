@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/dtos"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/entities"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -17,11 +16,11 @@ type DirectoriesController struct {
 	directoriesService *DirectoriesService
 }
 
-func NewController(config *config.Config, cache *cache.Cache, service *DirectoriesService) DirectoriesController {
-	return DirectoriesController{
+func NewController(config *config.Config, cache *cache.Cache, directoriesService *DirectoriesService) *DirectoriesController {
+	return &DirectoriesController{
 		cache:              cache,
 		config:             config,
-		directoriesService: service,
+		directoriesService: directoriesService,
 	}
 }
 
@@ -44,7 +43,7 @@ func (c *DirectoriesController) ListItems(ctx *gin.Context) {
 
 	// prevents from returning null when array is empty
 	if len(items) == 0 {
-		items = []entities.DirectoryItem{}
+		items = []dtos.DirectoryItemResponseDto{}
 	}
 
 	ctx.JSON(http.StatusOK, items)

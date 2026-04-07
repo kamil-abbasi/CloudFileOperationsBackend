@@ -24,6 +24,7 @@ services:
     volumes:
       - ./services/app/cmd:/usr/src/app/cmd
       - ./services/app/internal:/usr/src/app/internal
+      - ./services/app/pkg:/usr/src/app/pkg
       - app-data:/data
     environment:
       - PORT=8080

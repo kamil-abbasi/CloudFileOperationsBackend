@@ -14,7 +14,7 @@ type FileSystemStorageAdapter struct {
 	config *config.Config
 }
 
-func NewFileSystemStorageAdapter(config *config.Config) IStorage {
+func NewFileSystemAdapter(config *config.Config) IStorage {
 	return &FileSystemStorageAdapter{
 		config: config,
 	}

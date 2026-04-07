@@ -5,44 +5,50 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
-	directoriesInterfaces "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/interfaces"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/entities"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/storage"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/pkg"
 )
 
 type FilesService struct {
-	repository            interfaces.IFilesRepository
+	filesRepository       IFilesRepository
 	storage               storage.IStorage
-	directoriesRepository directoriesInterfaces.IDirectoriesRepository
+	directoriesRepository IDirectoriesRepository
 }
 
-func NewService(repository interfaces.IFilesRepository, directoriesRepository directoriesInterfaces.IDirectoriesRepository, storage storage.IStorage) FilesService {
-	return FilesService{
-		repository:            repository,
+func NewService(filesRepository IFilesRepository, directoriesRepository IDirectoriesRepository, storage storage.IStorage) *FilesService {
+	return &FilesService{
+		filesRepository:       filesRepository,
 		directoriesRepository: directoriesRepository,
 		storage:               storage,
 	}
 }
 
-func (s *FilesService) FindByLocation(location string) ([]entities.File, error) {
-	return s.repository.FindByLocation(location)
-}
-
-func (s *FilesService) FindOne(id string) (entities.File, error) {
-	file, found, err := s.repository.FindOne(id)
+func (s *FilesService) FindByLocation(location string) ([]dtos.FileResponseDto, error) {
+	entities, err := s.filesRepository.FindByLocation(location)
 
 	if err != nil {
-		return entities.File{}, err
+		return []dtos.FileResponseDto{}, err
+	}
+
+	result := pkg.SliceMap(entities, EntityToDto)
+
+	return result, nil
+}
+
+func (s *FilesService) FindOne(id string) (dtos.FileResponseDto, error) {
+	file, found, err := s.filesRepository.FindOne(id)
+
+	if err != nil {
+		return dtos.FileResponseDto{}, err
 	}
 
 	if !found {
-		return entities.File{}, ErrNotFound
+		return dtos.FileResponseDto{}, ErrNotFound
 	}
 
-	return file, nil
+	return EntityToDto(file), nil
 }
 
 func (s *FilesService) Download(id string) (io.ReadCloser, error) {
@@ -64,7 +70,7 @@ exceptions to handle:
 shared.DirectoryNotFound
 shared.FileAlreadyExists
 */
-func (s *FilesService) Create(userId string, dto dtos.CreateFileDto, reader io.Reader) (entities.File, error) {
+func (s *FilesService) Create(userId string, dto dtos.CreateFileDto, reader io.Reader) (dtos.FileResponseDto, error) {
 	// if directory id is empty file will be in the root directory
 	location := "/"
 
@@ -72,20 +78,20 @@ func (s *FilesService) Create(userId string, dto dtos.CreateFileDto, reader io.R
 		parentDir, found, err := s.directoriesRepository.FindOne(dto.DirectoryId)
 
 		if err != nil {
-			return entities.File{}, err
+			return dtos.FileResponseDto{}, err
 		}
 
 		if !found {
-			return entities.File{}, directories.ErrNotFound
+			return dtos.FileResponseDto{}, ErrDirectoryNotFound
 		}
 
 		location = filepath.Clean(filepath.Join(parentDir.Location, parentDir.Name))
 	}
 
-	_, found, err := s.repository.FindByNameAndDirectoryId(dto.Name, dto.DirectoryId)
+	_, found, err := s.filesRepository.FindByNameAndDirectoryId(dto.Name, dto.DirectoryId)
 
 	if found {
-		return entities.File{}, ErrAlreadyExists
+		return dtos.FileResponseDto{}, ErrAlreadyExists
 	}
 
 	file := entities.File{
@@ -102,38 +108,38 @@ func (s *FilesService) Create(userId string, dto dtos.CreateFileDto, reader io.R
 	file.Size = uint64(bytesWritten)
 
 	if err != nil {
-		return entities.File{}, err
+		return dtos.FileResponseDto{}, err
 	}
 
-	err = s.repository.Save(file)
+	err = s.filesRepository.Save(file)
 
 	if err != nil {
-		return entities.File{}, err
+		return dtos.FileResponseDto{}, err
 	}
 
-	return file, nil
+	return EntityToDto(file), nil
 }
 
-func (s *FilesService) Update(id string, dto dtos.UpdateFileDto) (entities.File, error) {
-	file, found, err := s.repository.FindOne(id)
+func (s *FilesService) Update(id string, dto dtos.UpdateFileDto) (dtos.FileResponseDto, error) {
+	file, found, err := s.filesRepository.FindOne(id)
 
 	if dto.Name == "" {
 		dto.Name = file.Name
 	}
 
 	if err != nil {
-		return entities.File{}, err
+		return dtos.FileResponseDto{}, err
 	}
 
 	if !found {
-		return entities.File{}, ErrNotFound
+		return dtos.FileResponseDto{}, ErrNotFound
 	}
 
 	if dto.DirectoryId != "" {
 		dir, found, err := s.directoriesRepository.FindOne(file.DirectoryId)
 
 		if err != nil || !found {
-			return entities.File{}, err
+			return dtos.FileResponseDto{}, err
 		}
 
 		file.DirectoryId = dto.DirectoryId
@@ -142,13 +148,13 @@ func (s *FilesService) Update(id string, dto dtos.UpdateFileDto) (entities.File,
 
 	file.Name = dto.Name
 
-	s.repository.Save(file)
+	s.filesRepository.Save(file)
 
-	return file, nil
+	return EntityToDto(file), nil
 }
 
 func (s *FilesService) Remove(id string) error {
-	wasRemoved, err := s.repository.Remove(id)
+	wasRemoved, err := s.filesRepository.Remove(id)
 
 	if err != nil {
 		return err

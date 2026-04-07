@@ -12,8 +12,8 @@ type UsageController struct {
 	usageService *UsageService
 }
 
-func NewController(usageService *UsageService) UsageController {
-	return UsageController{
+func NewController(usageService *UsageService) *UsageController {
+	return &UsageController{
 		usageService: usageService,
 	}
 }

@@ -27,7 +27,7 @@ func Run() error {
 	cfg, err := config.Load()
 
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to load app configuration. Details: %v", err)
 	}
 
 	// creating root path for user files
@@ -48,27 +48,29 @@ func Run() error {
 		return err
 	}
 
+	queries := database.New(postgres)
+
 	defer postgres.Close()
 
 	cache := cache.New(15*time.Minute, 10*time.Minute)
 
-	storageAdapter := storage.NewFileSystemStorageAdapter(cfg)
+	storageAdapter := storage.NewFileSystemAdapter(cfg)
 
-	filesRepository := files.NewPostgresRepository(postgres)
-	directoriesRepository := directories.NewPostgresRepository(cfg, postgres)
-	usersRepository := auth.NewPostgresRepository(postgres)
+	filesRepository := files.NewPostgresRepository(postgres, queries)
+	directoriesRepository := directories.NewPostgresRepository(postgres, queries)
+	usersRepository := auth.NewPostgresRepository(postgres, queries)
 
 	filesService := files.NewService(filesRepository, directoriesRepository, storageAdapter)
 	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storageAdapter)
-	usageService := usage.NewService(&filesService)
+	usageService := usage.NewService(filesService)
 	authService := auth.NewService(usersRepository, cfg)
 
-	filesController := files.NewController(cfg, cache, &filesService)
-	directoriesController := directories.NewController(cfg, cache, &directoriesService)
-	usageController := usage.NewController(&usageService)
+	filesController := files.NewController(cfg, cache, filesService)
+	directoriesController := directories.NewController(cfg, cache, directoriesService)
+	usageController := usage.NewController(usageService)
 	authController := auth.NewController(authService)
 
-	r := api.NewRouter(&filesController, &directoriesController, &usageController, authController, cfg)
+	r := api.NewRouter(filesController, directoriesController, usageController, authController, cfg)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 

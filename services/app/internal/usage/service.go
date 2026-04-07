@@ -11,8 +11,8 @@ type CalculateForLocationResult struct {
 	Size     uint64
 }
 
-func NewService(filesService *files.FilesService) UsageService {
-	return UsageService{
+func NewService(filesService *files.FilesService) *UsageService {
+	return &UsageService{
 		filesService: filesService,
 	}
 }

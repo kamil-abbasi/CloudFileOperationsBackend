@@ -11,68 +11,75 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/entities"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/interfaces"
-	fileInterfaces "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/storage"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/pkg"
 )
 
 type DirectoriesService struct {
-	repository      interfaces.IDirectoriesRepository
-	config          *config.Config
-	filesRepository fileInterfaces.IFilesRepository
-	storage         storage.IStorage
+	directoriesRepository IDirectoriesRepository
+	config                *config.Config
+	filesRepository       IFilesRepository
+	storage               storage.IStorage
 }
 
-func NewService(config *config.Config, repository interfaces.IDirectoriesRepository, filesRepository fileInterfaces.IFilesRepository, storage storage.IStorage) DirectoriesService {
-	return DirectoriesService{
-		repository:      repository,
-		config:          config,
-		filesRepository: filesRepository,
-		storage:         storage,
+func NewService(config *config.Config, directoriesRepository IDirectoriesRepository, filesRepository IFilesRepository, storage storage.IStorage) *DirectoriesService {
+	return &DirectoriesService{
+		directoriesRepository: directoriesRepository,
+		config:                config,
+		filesRepository:       filesRepository,
+		storage:               storage,
 	}
 }
 
-func (s *DirectoriesService) ListItems(location string) ([]entities.DirectoryItem, error) {
-	return s.repository.ListItems(location)
-}
-
-func (s *DirectoriesService) FindOne(id string) (entities.Directory, error) {
-	dir, found, err := s.repository.FindOne(id)
+func (s *DirectoriesService) ListItems(location string) ([]dtos.DirectoryItemResponseDto, error) {
+	items, err := s.directoriesRepository.ListItems(location)
 
 	if err != nil {
-		return entities.Directory{}, err
+		return []dtos.DirectoryItemResponseDto{}, err
+	}
+
+	result := pkg.SliceMap(items, ItemEntityToDto)
+
+	return result, nil
+}
+
+func (s *DirectoriesService) FindOne(id string) (dtos.DirectoryResponseDto, error) {
+	dir, found, err := s.directoriesRepository.FindOne(id)
+
+	if err != nil {
+		return dtos.DirectoryResponseDto{}, err
 	}
 
 	if !found {
-		return entities.Directory{}, ErrNotFound
+		return dtos.DirectoryResponseDto{}, ErrNotFound
 	}
 
-	return dir, nil
+	return EntityToDto(dir), nil
 }
 
-func (s *DirectoriesService) Create(userId string, dto dtos.CreateDirectoryDto) (entities.Directory, error) {
+func (s *DirectoriesService) Create(userId string, dto dtos.CreateDirectoryDto) (dtos.DirectoryResponseDto, error) {
 	var parentId = ""
 	var location = "/"
 
 	if dto.ParentId != "" {
-		_, found, err := s.repository.FindByNameAndParentId(dto.Name, dto.ParentId)
+		_, found, err := s.directoriesRepository.FindByNameAndParentId(dto.Name, dto.ParentId)
 
 		if err != nil {
-			return entities.Directory{}, err
+			return dtos.DirectoryResponseDto{}, err
 		}
 
 		if found {
-			return entities.Directory{}, ErrAlreadyExists
+			return dtos.DirectoryResponseDto{}, ErrAlreadyExists
 		}
 
-		parentDir, found, err := s.repository.FindOne(dto.ParentId)
+		parentDir, found, err := s.directoriesRepository.FindOne(dto.ParentId)
 
 		if err != nil {
-			return entities.Directory{}, err
+			return dtos.DirectoryResponseDto{}, err
 		}
 
 		if !found {
-			return entities.Directory{}, ErrNotFound
+			return dtos.DirectoryResponseDto{}, ErrNotFound
 		}
 
 		parentId = parentDir.Id
@@ -87,32 +94,32 @@ func (s *DirectoriesService) Create(userId string, dto dtos.CreateDirectoryDto) 
 		Location: filepath.Clean(location),
 	}
 
-	err := s.repository.Save(directory)
+	err := s.directoriesRepository.Save(directory)
 
 	if err != nil {
-		return entities.Directory{}, err
+		return dtos.DirectoryResponseDto{}, err
 	}
 
-	return directory, nil
+	return EntityToDto(directory), nil
 }
 
 // not implemented
-func (s *DirectoriesService) Update(id string, dto dtos.UpdateDirectoryDto) (entities.Directory, error) {
-	return entities.Directory{}, fmt.Errorf("operation not implemented")
+func (s *DirectoriesService) Update(id string, dto dtos.UpdateDirectoryDto) (dtos.DirectoryResponseDto, error) {
+	return dtos.DirectoryResponseDto{}, fmt.Errorf("operation not implemented")
 }
 
 // not implemented
-func (s *DirectoriesService) Rename(id string, newName string) (entities.Directory, error) {
-	return entities.Directory{}, fmt.Errorf("operation not implemented")
+func (s *DirectoriesService) Rename(id string, newName string) (dtos.DirectoryResponseDto, error) {
+	return dtos.DirectoryResponseDto{}, fmt.Errorf("operation not implemented")
 }
 
 // not implemented
-func (s *DirectoriesService) Move(id string, parentId string) (entities.Directory, error) {
-	return entities.Directory{}, fmt.Errorf("operation not implemented")
+func (s *DirectoriesService) Move(id string, parentId string) (dtos.DirectoryResponseDto, error) {
+	return dtos.DirectoryResponseDto{}, fmt.Errorf("operation not implemented")
 }
 
 func (s *DirectoriesService) Remove(id string) error {
-	dir, found, err := s.repository.FindOne(id)
+	dir, found, err := s.directoriesRepository.FindOne(id)
 
 	if err != nil {
 		return err
@@ -132,7 +139,7 @@ func (s *DirectoriesService) Remove(id string) error {
 		s.storage.RemoveFile(file.Id)
 	}
 
-	_, err = s.repository.Remove(id)
+	_, err = s.directoriesRepository.Remove(id)
 
 	if err != nil {
 		return err
@@ -142,7 +149,7 @@ func (s *DirectoriesService) Remove(id string) error {
 }
 
 func (s *DirectoriesService) Download(id string, writer io.Writer) error {
-	directory, found, err := s.repository.FindOne(id)
+	directory, found, err := s.directoriesRepository.FindOne(id)
 
 	if err != nil {
 		return err

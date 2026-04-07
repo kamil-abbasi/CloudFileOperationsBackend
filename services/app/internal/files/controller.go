@@ -20,11 +20,11 @@ type FilesController struct {
 	filesService *FilesService
 }
 
-func NewController(config *config.Config, cache *cache.Cache, service *FilesService) FilesController {
-	return FilesController{
+func NewController(config *config.Config, cache *cache.Cache, filesService *FilesService) *FilesController {
+	return &FilesController{
 		cache:        cache,
 		config:       config,
-		filesService: service,
+		filesService: filesService,
 	}
 }
 
