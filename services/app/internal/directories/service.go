@@ -13,17 +13,17 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/entities"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/interfaces"
 	fileInterfaces "github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/storage"
 )
 
 type DirectoriesService struct {
 	repository      interfaces.IDirectoriesRepository
 	config          *config.Config
 	filesRepository fileInterfaces.IFilesRepository
-	storage         shared.IStorage
+	storage         storage.IStorage
 }
 
-func NewService(config *config.Config, repository interfaces.IDirectoriesRepository, filesRepository fileInterfaces.IFilesRepository, storage shared.IStorage) DirectoriesService {
+func NewService(config *config.Config, repository interfaces.IDirectoriesRepository, filesRepository fileInterfaces.IFilesRepository, storage storage.IStorage) DirectoriesService {
 	return DirectoriesService{
 		repository:      repository,
 		config:          config,
@@ -36,11 +36,21 @@ func (s *DirectoriesService) ListItems(location string) ([]entities.DirectoryIte
 	return s.repository.ListItems(location)
 }
 
-func (s *DirectoriesService) FindOne(id string) (entities.Directory, bool, error) {
-	return s.repository.FindOne(id)
+func (s *DirectoriesService) FindOne(id string) (entities.Directory, error) {
+	dir, found, err := s.repository.FindOne(id)
+
+	if err != nil {
+		return entities.Directory{}, err
+	}
+
+	if !found {
+		return entities.Directory{}, ErrNotFound
+	}
+
+	return dir, nil
 }
 
-func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Directory, error) {
+func (s *DirectoriesService) Create(userId string, dto dtos.CreateDirectoryDto) (entities.Directory, error) {
 	var parentId = ""
 	var location = "/"
 
@@ -52,7 +62,7 @@ func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Direc
 		}
 
 		if found {
-			return entities.Directory{}, &shared.DirectoryAlreadyExistsError{}
+			return entities.Directory{}, ErrAlreadyExists
 		}
 
 		parentDir, found, err := s.repository.FindOne(dto.ParentId)
@@ -62,7 +72,7 @@ func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Direc
 		}
 
 		if !found {
-			return entities.Directory{}, &shared.DirectoryNotFoundError{}
+			return entities.Directory{}, ErrNotFound
 		}
 
 		parentId = parentDir.Id
@@ -71,7 +81,7 @@ func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Direc
 
 	directory := entities.Directory{
 		Id:       uuid.NewString(),
-		UserId:   dto.UserId,
+		UserId:   userId,
 		ParentId: parentId,
 		Name:     dto.Name,
 		Location: filepath.Clean(location),
@@ -87,55 +97,35 @@ func (s *DirectoriesService) Create(dto dtos.CreateDirectoryDto) (entities.Direc
 }
 
 // not implemented
-func (s *DirectoriesService) Update(dto dtos.UpdateDirectoryDto) (entities.Directory, bool, error) {
-	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
+func (s *DirectoriesService) Update(id string, dto dtos.UpdateDirectoryDto) (entities.Directory, error) {
+	return entities.Directory{}, fmt.Errorf("operation not implemented")
 }
 
 // not implemented
-func (s *DirectoriesService) Rename(id string, newName string) (entities.Directory, bool, error) {
-	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
-
-	directory, found, err := s.repository.FindOne(id)
-
-	if err != nil {
-		return entities.Directory{}, false, err
-	}
-
-	if !found {
-		return entities.Directory{}, false, nil
-	}
-
-	location := directory.Location
-	newLocation := filepath.Join(filepath.Dir(location), newName)
-
-	directory.Location = newLocation
-	directory.Name = newName
-
-	s.repository.Save(directory)
-
-	return directory, true, nil
+func (s *DirectoriesService) Rename(id string, newName string) (entities.Directory, error) {
+	return entities.Directory{}, fmt.Errorf("operation not implemented")
 }
 
 // not implemented
-func (s *DirectoriesService) Move(id string, parentId string) (entities.Directory, bool, error) {
-	return entities.Directory{}, false, fmt.Errorf("operation not implemented")
+func (s *DirectoriesService) Move(id string, parentId string) (entities.Directory, error) {
+	return entities.Directory{}, fmt.Errorf("operation not implemented")
 }
 
-func (s *DirectoriesService) Remove(id string) (bool, error) {
+func (s *DirectoriesService) Remove(id string) error {
 	dir, found, err := s.repository.FindOne(id)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if !found {
-		return false, nil
+		return ErrNotFound
 	}
 
 	files, err := s.filesRepository.FindByLocation(filepath.Join(dir.Location, dir.Name))
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	for _, file := range files {
@@ -145,27 +135,27 @@ func (s *DirectoriesService) Remove(id string) (bool, error) {
 	_, err = s.repository.Remove(id)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
-func (s *DirectoriesService) Download(id string, writer io.Writer) (bool, error) {
+func (s *DirectoriesService) Download(id string, writer io.Writer) error {
 	directory, found, err := s.repository.FindOne(id)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	if !found {
-		return false, nil
+		return ErrNotFound
 	}
 
 	files, err := s.filesRepository.FindByLocation(filepath.Join(directory.Location, directory.Name))
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	zipWriter := zip.NewWriter(writer)
@@ -184,14 +174,14 @@ func (s *DirectoriesService) Download(id string, writer io.Writer) (bool, error)
 
 		// TODO: handle error properly
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		readCloser, found, err := s.storage.DownloadFile(file.Id)
 
 		// TODO: handle error properly
 		if err != nil || !found {
-			return false, err
+			return err
 		}
 
 		_, err = io.Copy(f, readCloser)
@@ -199,9 +189,9 @@ func (s *DirectoriesService) Download(id string, writer io.Writer) (bool, error)
 		readCloser.Close()
 
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
 
-	return true, nil
+	return nil
 }

@@ -1,7 +1,6 @@
 package dtos
 
 type CreateFileDto struct {
-	UserId      string
-	DirectoryId string
-	Name        string
+	DirectoryId string `json:"directoryId"`
+	Name        string `json:"name" binding:"required"`
 }

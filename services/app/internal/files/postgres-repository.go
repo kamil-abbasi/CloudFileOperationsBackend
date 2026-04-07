@@ -4,21 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/entities"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/interfaces"
 )
 
 type FilesPostgresRepository struct {
-	db     *sql.DB
-	config *config.Config
+	db *sql.DB
 }
 
-func NewPostgresRepository(config *config.Config, db *sql.DB) interfaces.IFilesRepository {
+func NewPostgresRepository(db *sql.DB) interfaces.IFilesRepository {
 	return &FilesPostgresRepository{
-		db:     db,
-		config: config,
+		db: db,
 	}
 }
 
@@ -249,7 +246,7 @@ func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
 	result, err := tx.Exec("DELETE FROM files WHERE id = $1", id)
 	_, err = tx.Exec(`
 		DELETE FROM directory_items
-		WHERE id = $1 AND type = "file"`, id)
+		WHERE id = $1 AND type = 'file'`, id)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove file from postgres, details: %v", err)

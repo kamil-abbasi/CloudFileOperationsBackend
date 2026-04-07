@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/api"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/auth"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
@@ -53,18 +54,21 @@ func Run() error {
 
 	storageAdapter := storage.NewFileSystemStorageAdapter(cfg)
 
-	filesRepository := files.NewPostgresRepository(cfg, postgres)
+	filesRepository := files.NewPostgresRepository(postgres)
 	directoriesRepository := directories.NewPostgresRepository(cfg, postgres)
+	usersRepository := auth.NewPostgresRepository(postgres)
 
 	filesService := files.NewService(filesRepository, directoriesRepository, storageAdapter)
 	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storageAdapter)
 	usageService := usage.NewService(&filesService)
+	authService := auth.NewService(usersRepository, cfg)
 
 	filesController := files.NewController(cfg, cache, &filesService)
 	directoriesController := directories.NewController(cfg, cache, &directoriesService)
 	usageController := usage.NewController(&usageService)
+	authController := auth.NewController(authService)
 
-	r := api.NewRouter(&filesController, &directoriesController, &usageController)
+	r := api.NewRouter(&filesController, &directoriesController, &usageController, authController, cfg)
 	r.SetTrustedProxies([]string{"reverse-proxy"})
 	r.Run()
 

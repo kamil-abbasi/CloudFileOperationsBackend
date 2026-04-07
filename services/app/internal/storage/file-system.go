@@ -14,7 +14,7 @@ type FileSystemStorageAdapter struct {
 	config *config.Config
 }
 
-func NewFileSystemStorageAdapter(config *config.Config) shared.IStorage {
+func NewFileSystemStorageAdapter(config *config.Config) IStorage {
 	return &FileSystemStorageAdapter{
 		config: config,
 	}
@@ -36,7 +36,7 @@ func (storage *FileSystemStorageAdapter) UploadFile(key string, src io.Reader) (
 	}
 
 	if exists {
-		return 0, &shared.FileAlreadyExistsError{}
+		return 0, ErrAlreadyExists
 	}
 
 	file, err := os.Create(path)

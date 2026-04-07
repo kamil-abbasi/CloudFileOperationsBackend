@@ -7,16 +7,18 @@ import (
 )
 
 type Config struct {
-	Port           uint32
-	RootPath       string
-	MaxUploadBytes uint64
-	UsageCacheTTL  uint32
-	LogLevel       string
-	GinMode        string
-	PgDb           string
-	PgUser         string
-	PgPassword     string
-	PgHost         string
+	Port              uint32
+	RootPath          string
+	MaxUploadBytes    uint64
+	UsageCacheTTL     uint32
+	LogLevel          string
+	GinMode           string
+	PgDb              string
+	PgUser            string
+	PgPassword        string
+	PgHost            string
+	JwtPrivateKeyPath string
+	JwtPublicKeyPath  string
 }
 
 func Load() (*Config, error) {
@@ -32,6 +34,8 @@ func Load() (*Config, error) {
 	pgUser := os.Getenv("PG_USER")
 	pgPassword := os.Getenv("PG_PASSWORD")
 	pgHost := os.Getenv("PG_HOST")
+	jwtPrivateKeyPath := os.Getenv("JWT_PRIVATE_KEY_PATH")
+	jwtPublicKeyPath := os.Getenv("JWT_PUBLIC_KEY_PATH")
 
 	port, err := strconv.Atoi(portStr)
 
@@ -61,6 +65,8 @@ func Load() (*Config, error) {
 	config.PgUser = pgUser
 	config.PgPassword = pgPassword
 	config.PgHost = pgHost
+	config.JwtPrivateKeyPath = jwtPrivateKeyPath
+	config.JwtPublicKeyPath = jwtPublicKeyPath
 
 	return config, nil
 }

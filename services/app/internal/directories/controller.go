@@ -8,7 +8,6 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/dtos"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/entities"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -38,11 +37,8 @@ func (c *DirectoriesController) ListItems(ctx *gin.Context) {
 	items, err := c.directoriesService.ListItems(location)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -57,23 +53,11 @@ func (c *DirectoriesController) ListItems(ctx *gin.Context) {
 func (c *DirectoriesController) FindOne(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	dir, found, err := c.directoriesService.FindOne(id)
+	dir, err := c.directoriesService.FindOne(id)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !found {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "Directory not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -86,80 +70,26 @@ func (c *DirectoriesController) Download(ctx *gin.Context) {
 
 	id := ctx.Param("id")
 
-	found, err := c.directoriesService.Download(id, ctx.Writer)
+	err := c.directoriesService.Download(id, ctx.Writer)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !found {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "Directory not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
 }
 
 func (c *DirectoriesController) Create(ctx *gin.Context) {
-	var fields struct {
-		Name     string
-		ParentId string
-	}
+	data, _ := ctx.Get("validatedBody")
+	createDto := data.(dtos.CreateDirectoryDto)
+	userId := ctx.GetString("userId")
 
-	if err := ctx.ShouldBindJSON(&fields); err != nil {
-		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
-			Code:    http.StatusBadGateway,
-			Message: "Invalid request body",
-		})
-
-		return
-	}
-
-	createDto := dtos.CreateDirectoryDto{
-		UserId:   "user-dev",
-		ParentId: fields.ParentId,
-		Name:     fields.Name,
-	}
-
-	directory, err := c.directoriesService.Create(createDto)
+	directory, err := c.directoriesService.Create(userId, createDto)
 
 	if err != nil {
-		// TODO: handle errs
-		_, ok := err.(*shared.DirectoryAlreadyExistsError)
-
-		if ok {
-			ctx.JSON(http.StatusConflict, &shared.HttpError{
-				Code:    http.StatusConflict,
-				Message: "Directory already exists",
-			})
-
-			return
-		}
-
-		_, ok = err.(*shared.DirectoryNotFoundError)
-
-		if ok {
-			ctx.JSON(http.StatusNotFound, &shared.HttpError{
-				Code:    http.StatusNotFound,
-				Message: "Parent directory not found",
-			})
-
-			return
-		}
-
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal error",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -168,41 +98,14 @@ func (c *DirectoriesController) Create(ctx *gin.Context) {
 
 func (c *DirectoriesController) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
+	data, _ := ctx.Get("validatedBody")
+	dto := data.(dtos.UpdateDirectoryDto)
 
-	var fields struct {
-		Name string
-	}
-
-	if err := ctx.ShouldBindJSON(&fields); err != nil {
-		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
-			Code:    http.StatusBadGateway,
-			Message: "Invalid request body",
-		})
-
-		return
-	}
-
-	dto := dtos.UpdateDirectoryDto{}
-	dto.Where.Id = id
-	dto.Fields.Name = fields.Name
-
-	directory, found, err := c.directoriesService.Update(dto)
+	directory, err := c.directoriesService.Update(id, dto)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !found {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "Directory not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -212,23 +115,11 @@ func (c *DirectoriesController) Update(ctx *gin.Context) {
 func (c *DirectoriesController) Remove(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	removed, err := c.directoriesService.Remove(id)
+	err := c.directoriesService.Remove(id)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !removed {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "Directory not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 

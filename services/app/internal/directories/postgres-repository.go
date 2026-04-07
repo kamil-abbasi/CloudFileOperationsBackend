@@ -187,7 +187,7 @@ func (repository *DirectoriesPostgresRepository) Save(directory entities.Directo
 
 	defer tx.Rollback()
 
-	_, err = repository.db.Exec(
+	_, err = tx.Exec(
 		`INSERT INTO
 		directories(id, user_id, parent_id, name, location)
 		VALUES($1, $2, $3, $4, $5)

@@ -29,10 +29,18 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 		return nil, err
 	}
 
+	createUsersTableStatement := `
+		CREATE TABLE IF NOT EXISTS users (
+			id UUID NOT NULL PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL
+		)
+	`
+
 	createDirectoriesTableStatement := `
 		CREATE TABLE IF NOT EXISTS directories (
 			id UUID NOT NULL PRIMARY KEY,
-			user_id TEXT NOT NULL,
+			user_id UUID NOT NULL,
 			parent_id UUID,
 			name TEXT NOT NULL,
 			location TEXT NOT NULL,
@@ -45,7 +53,7 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 	createFilesTableStatement := `
 		CREATE TABLE IF NOT EXISTS files (
 			id UUID NOT NULL PRIMARY KEY,
-			user_id TEXT NOT NULL,
+			user_id UUID NOT NULL,
 			directory_id UUID,
 			name TEXT NOT NULL,
 			size INTEGER NOT NULL,
@@ -63,11 +71,12 @@ func NewPostgres(config PostgresConfig) (*sql.DB, error) {
 	createDirectoryItemsTableStatement := `
 		CREATE TABLE IF NOT EXISTS directory_items (
 			id UUID NOT NULL PRIMARY KEY,
-			user_id TEXT NOT NULL,
+			user_id UUID NOT NULL,
 			type item_type NOT NULL
 		)
 	`
 
+	_, err = db.Exec(createUsersTableStatement)
 	_, err = db.Exec(createDirectoriesTableStatement)
 	_, err = db.Exec(createFilesTableStatement)
 	_, err = db.Exec(createItemTypeEnumStatement)

@@ -62,7 +62,7 @@ This project is a backend for storing and managing files.
 
 ## Development
 
-To start in development mode run: `docker compose up -d --build`.
+To start in development mode run: `docker compose -f compose.local.yaml up -d --build`.
 
 **Tip**: Install go and your editor's tooling for it to have better developer experience.
 
@@ -70,7 +70,7 @@ After starting the app REST API will be available on `http://localhost:8080`
 
 ## Production
 
-To start in production mode run: `docker compose -f prod.compose.yaml up -d --build`
+To start in production mode run: `docker compose up -d --build`
 
 # Services
 

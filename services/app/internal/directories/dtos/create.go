@@ -1,7 +1,6 @@
 package dtos
 
 type CreateDirectoryDto struct {
-	UserId   string
-	ParentId string
-	Name     string
+	ParentId string `json:"parentId"`
+	Name     string `json:"name" binding:"required"`
 }

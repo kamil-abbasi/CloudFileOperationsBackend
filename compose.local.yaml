@@ -3,19 +3,41 @@ services:
     build:
       context: ./services/reverse-proxy
       dockerfile: Dockerfile
-    env_file:
-      - ./services/reverse-proxy/.env
+    restart: always
+    volumes:
+      - type: bind
+        source: ./services/reverse-proxy/etc/nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+      - type: bind
+        source: ./services/reverse-proxy/etc/nginx/proxy_params.conf
+        target: /etc/nginx/proxy_params.conf
     ports:
       - 8080:80
     depends_on:
       app:
         condition: service_healthy
   app:
+    restart: always
     build:
       context: ./services/app
-      target: prod
-    env_file:
-      - ./services/app/.env
+      target: dev
+    volumes:
+      - ./services/app/cmd:/usr/src/app/cmd
+      - ./services/app/internal:/usr/src/app/internal
+      - app-data:/data
+    environment:
+      - PORT=8080
+      - GIN_MODE=debug
+      - ROOT_PATH=/data
+      - MAX_UPLOAD_BYTES=1073741824 # 1GB
+      - USAGE_CACHE_TTL=60
+      - LOG_LEVEL=debug
+      - PG_DB=app
+      - PG_USER=admin
+      - PG_PASSWORD=admin
+      - PG_HOST=database
+      - JWT_PRIVATE_KEY_PATH=jwt-private-key.pem
+      - JWT_PUBLIC_KEY_PATH=jwt-public-key.pem
     healthcheck:
       test: ['CMD', './healthcheck']
       interval: 30s
@@ -27,13 +49,11 @@ services:
         condition: service_healthy
       file-storage:
         condition: service_healthy
-        
+
   file-storage:
     build:
       context: ./services/file-storage
     restart: always
-    env_file:
-      - ./services/file-storage/.env
     volumes:
       - file-storage-data:/data
     healthcheck:
@@ -47,8 +67,10 @@ services:
     build:
       context: ./services/database
     restart: always
-    env_file:
-      - ./services/database/.env
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=app
     volumes:
       - db-data:/var/lib/postgresql
     healthcheck:
@@ -56,3 +78,7 @@ services:
       timeout: 30s
       retries: 5
       start_period: 20s
+volumes:
+  app-data:
+  db-data:
+  file-storage-data:

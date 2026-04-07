@@ -2,7 +2,6 @@ package files
 
 import (
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
-	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
 type FilesController struct {
@@ -32,22 +30,12 @@ func NewController(config *config.Config, cache *cache.Cache, service *FilesServ
 
 // POST /v1/files
 func (c *FilesController) Upload(ctx *gin.Context) {
-	rawFile, err := ctx.FormFile("file")
-	directoryId := ctx.PostForm("directoryId")
-	userId := "user-dev"
+	data, _ := ctx.Get("validatedBody")
+	dto := data.(dtos.UploadFileDto)
 
-	idempotencyKey := ctx.PostForm("idempotencyKey")
-	requestId := idempotencyKey + userId
+	userId := ctx.GetString("userId")
 
-	if idempotencyKey == "" {
-		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
-			Code:    http.StatusBadRequest,
-			Message: "Missing idempotency key",
-		})
-
-		return
-	}
-
+	requestId := dto.IdempotencyKey + userId
 	response, found := c.cache.Get(requestId)
 
 	if found {
@@ -56,56 +44,24 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 		return
 	}
 
-	reader, err := rawFile.Open()
+	reader, err := dto.File.Open()
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
 	defer reader.Close()
 
-	file, err := c.filesService.Create(dtos.CreateFileDto{
-		Name:        rawFile.Filename,
-		UserId:      userId,
-		DirectoryId: directoryId,
+	file, err := c.filesService.Create(userId, dtos.CreateFileDto{
+		Name:        dto.File.Filename,
+		DirectoryId: dto.DirectoryId,
 	}, reader)
 
 	if err != nil {
-
-		_, ok := err.(*shared.FileAlreadyExistsError)
-
-		if ok {
-			ctx.JSON(http.StatusConflict, &shared.HttpError{
-				Code:    http.StatusConflict,
-				Message: "File already exists",
-			})
-
-			return
-		}
-
-		_, ok = err.(*shared.DirectoryNotFoundError)
-
-		if ok {
-			ctx.JSON(http.StatusNotFound, &shared.HttpError{
-				Code:    http.StatusNotFound,
-				Message: "Directory not found",
-			})
-
-			return
-		}
-
-		log.Print(err)
-
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -117,34 +73,19 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 func (c *FilesController) Download(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	file, found, err := c.filesService.FindOne(id)
+	file, err := c.filesService.FindOne(id)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
-	if !found {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "File not found",
-		})
+	src, err := c.filesService.Download(id)
 
-		return
-	}
-
-	src, found, err := c.filesService.Download(id)
-
-	if err != nil || !found || src == nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
+	if err != nil {
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -163,23 +104,11 @@ func (c *FilesController) Download(ctx *gin.Context) {
 func (c *FilesController) FindOne(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	file, found, err := c.filesService.FindOne(id)
+	file, err := c.filesService.FindOne(id)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !found {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "File not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -189,43 +118,14 @@ func (c *FilesController) FindOne(ctx *gin.Context) {
 // PATCH /v1/files/:id
 func (c *FilesController) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
+	data, _ := ctx.Get("validatedBody")
+	updateDto := data.(dtos.UpdateFileDto)
 
-	var fields struct {
-		Name        string
-		DirectoryId string
-	}
-
-	if err := ctx.ShouldBindJSON(&fields); err != nil {
-		ctx.JSON(http.StatusBadRequest, &shared.HttpError{
-			Code:    http.StatusBadRequest,
-			Message: "Invalid request body",
-		})
-
-		return
-	}
-
-	updateDto := dtos.UpdateFileDto{}
-	updateDto.Where.Id = id
-	updateDto.Fields.Name = fields.Name
-	updateDto.Fields.DirectoryId = fields.DirectoryId
-
-	file, updated, err := c.filesService.Update(updateDto)
+	file, err := c.filesService.Update(id, updateDto)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !updated {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "File not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
@@ -236,25 +136,11 @@ func (c *FilesController) Update(ctx *gin.Context) {
 func (c *FilesController) Remove(ctx *gin.Context) {
 	id := ctx.Param("id")
 
-	removed, err := c.filesService.Remove(id)
+	err := c.filesService.Remove(id)
 
 	if err != nil {
-		log.Print(err)
-
-		ctx.JSON(http.StatusInternalServerError, &shared.HttpError{
-			Code:    http.StatusInternalServerError,
-			Message: "Internal server error",
-		})
-
-		return
-	}
-
-	if !removed {
-		ctx.JSON(http.StatusNotFound, &shared.HttpError{
-			Code:    http.StatusNotFound,
-			Message: "File not found",
-		})
-
+		ctx.Error(err)
+		ctx.Abort()
 		return
 	}
 
