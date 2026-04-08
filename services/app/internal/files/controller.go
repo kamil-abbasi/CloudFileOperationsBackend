@@ -73,12 +73,27 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 // GET /v1/files/:id/download
 func (c *FilesController) Download(ctx *gin.Context) {
 	id := ctx.Param("id")
+	ifNoneMatch := ctx.GetHeader("If-None-Match")
 
 	file, err := c.filesService.FindOne(id)
 
 	if err != nil {
 		ctx.Error(err)
 		ctx.Abort()
+		return
+	}
+
+	extraHeaders := map[string]string{
+		"Content-Disposition": fmt.Sprintf("attachment; filename=\"%v\"", file.Name),
+		"ETag":                file.Checksum,
+	}
+	contentType := mime.TypeByExtension(filepath.Ext(file.Name))
+
+	if file.Checksum == ifNoneMatch {
+		ctx.Header("ETag", extraHeaders["ETag"])
+		ctx.Header("Content-Disposition", extraHeaders["Content-Disposition"])
+		ctx.Header("Content-Type", contentType)
+		ctx.AbortWithStatus(http.StatusNotModified)
 		return
 	}
 
@@ -91,11 +106,6 @@ func (c *FilesController) Download(ctx *gin.Context) {
 	}
 
 	defer src.Close()
-
-	extraHeaders := map[string]string{
-		"Content-Disposition": fmt.Sprintf("attachment; filename=\"%v\"", file.Name),
-	}
-	contentType := mime.TypeByExtension(filepath.Ext(file.Name))
 
 	// sending file
 	ctx.DataFromReader(http.StatusCreated, int64(file.Size), contentType, src, extraHeaders)
