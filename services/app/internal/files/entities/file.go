@@ -7,4 +7,5 @@ type File struct {
 	Name        string
 	Size        uint64
 	Location    string
+	Checksum    string
 }

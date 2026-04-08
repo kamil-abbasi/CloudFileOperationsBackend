@@ -55,7 +55,7 @@ services:
     build:
       context: ./services/app
       target: dev
-    command: chmod u+x ./db-migrate.sh && ./db-migrate.sh
+    command: sh ./db-migrate.sh
     depends_on:
       database:
         condition: service_healthy

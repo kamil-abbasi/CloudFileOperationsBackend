@@ -94,8 +94,12 @@ func (s *FilesService) Create(userId string, dto dtos.CreateFileDto, reader io.R
 		return dtos.FileResponseDto{}, ErrAlreadyExists
 	}
 
+	fileId := uuid.NewString()
+
+	bytesWritten, checksum, err := s.storage.UploadFile(fileId, reader)
+
 	file := entities.File{
-		Id:          uuid.NewString(),
+		Id:          fileId,
 		UserId:      userId,
 		DirectoryId: dto.DirectoryId,
 		Name:        dto.Name,
@@ -103,9 +107,12 @@ func (s *FilesService) Create(userId string, dto dtos.CreateFileDto, reader io.R
 		Location:    location,
 	}
 
-	bytesWritten, err := s.storage.UploadFile(file.Id, reader)
-
 	file.Size = uint64(bytesWritten)
+	file.Checksum = checksum
+
+	if file.Checksum != dto.Checksum {
+		return dtos.FileResponseDto{}, ErrCorruptedUpload
+	}
 
 	if err != nil {
 		return dtos.FileResponseDto{}, err

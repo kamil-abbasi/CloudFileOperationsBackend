@@ -1,27 +1,27 @@
 -- name: FindFiles :many
-SELECT id, user_id, directory_id, name, size, location
+SELECT *
 FROM files
 WHERE directory_id = $1;
 
 -- name: FindFilesByLocation :many
-SELECT id, user_id, directory_id, name, size, location
+SELECT *
 FROM files
 WHERE location LIKE $1 || '%';
 
 -- name: FindFileById :one
-SELECT id, user_id, directory_id, name, size, location
+SELECT *
 FROM files
 WHERE id = $1;
 
 -- name: FindFileByNameAndDirectoryId :one
-SELECT id, user_id, directory_id, name, size, location
+SELECT *
 FROM files
 WHERE name = $1
 AND directory_id IS NOT DISTINCT FROM $2;
 
 -- name: SaveFile :exec
-INSERT INTO files(id, user_id, directory_id, name, size, location)
-VALUES($1, $2, $3, $4, $5, $6)
+INSERT INTO files(id, user_id, directory_id, name, size, location, checksum)
+VALUES($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT(id)
 DO UPDATE SET
 	user_id = EXCLUDED.user_id,
@@ -53,16 +53,16 @@ FROM files f
 WHERE f.location = $1;
 
 -- name: FindDirectories :many
-SELECT id, user_id, parent_id, name, location
+SELECT *
 FROM directories;
 
 -- name: FindDirectoryById :one
-SELECT id, user_id, parent_id, name, location
+SELECT *
 FROM directories
 WHERE id = $1;
 
 -- name: FindDirectoryByNameAndParentId :one
-SELECT id, user_id, parent_id, name, location
+SELECT *
 FROM directories
 WHERE name = $1 AND parent_id IS NOT DISTINCT FROM $2;
 
@@ -90,7 +90,7 @@ DELETE FROM directory_items
 WHERE id = $1 AND type = 'directory';
 
 -- name: FindUserByName :one
-SELECT id, name, password_hash
+SELECT *
 FROM users
 WHERE name = $1;
 

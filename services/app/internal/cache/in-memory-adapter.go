@@ -11,7 +11,9 @@ type InMemoryAdapter struct {
 }
 
 func NewInMemoryAdapter() ICache {
-	return &InMemoryAdapter{}
+	return &InMemoryAdapter{
+		cache: cache.New(time.Minute*15, time.Minute*10),
+	}
 }
 
 func (c *InMemoryAdapter) Get(key string) (any, bool) {

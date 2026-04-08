@@ -37,6 +37,11 @@ func Error() gin.HandlerFunc {
 					Code:    http.StatusConflict,
 					Message: "File already exists",
 				})
+			} else if errors.Is(actualErr, files.ErrCorruptedUpload) {
+				ctx.JSON(http.StatusBadRequest, &shared.HttpError{
+					Code:    http.StatusBadRequest,
+					Message: "File upload was corrupted: checksums do not match",
+				})
 			} else if errors.Is(actualErr, files.ErrNotFound) {
 				ctx.JSON(http.StatusNotFound, &shared.HttpError{
 					Code:    http.StatusNotFound,

@@ -1,3 +1,6 @@
-#!/bin/bash
+#!/bin/sh
+set -eu
 
-migrate -database postgresql://admin:admin@database/app?sslmode=disable -path ./db/migrations up
+MIGRATE_DB_URL="postgresql://${PG_USER:-admin}:${PG_PASSWORD:-admin}@${PG_HOST:-database}/${PG_DB:-app}?sslmode=disable"
+
+migrate -database "${MIGRATE_DB_URL}" -path ./db/migrations up

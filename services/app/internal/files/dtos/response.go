@@ -7,4 +7,5 @@ type FileResponseDto struct {
 	Name        string `json:"name"`
 	Size        uint64 `json:"size"`
 	Location    string `json:"location"`
+	Checksum    string `json:"checksum"`
 }

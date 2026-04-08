@@ -74,6 +74,7 @@ type File struct {
 	Name        string
 	Size        int32
 	Location    string
+	Checksum    string
 }
 
 type User struct {

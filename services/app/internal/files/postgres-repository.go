@@ -142,6 +142,7 @@ func (r *FilesPostgresRepository) Save(file entities.File) error {
 		Name:        file.Name,
 		Size:        int32(file.Size),
 		Location:    file.Location,
+		Checksum:    file.Checksum,
 	})
 
 	if err != nil {

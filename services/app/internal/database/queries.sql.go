@@ -90,7 +90,7 @@ func (q *Queries) FindDirectoryByNameAndParentId(ctx context.Context, arg FindDi
 }
 
 const findFileById = `-- name: FindFileById :one
-SELECT id, user_id, directory_id, name, size, location
+SELECT id, user_id, directory_id, name, size, location, checksum
 FROM files
 WHERE id = $1
 `
@@ -105,12 +105,13 @@ func (q *Queries) FindFileById(ctx context.Context, id uuid.UUID) (File, error) 
 		&i.Name,
 		&i.Size,
 		&i.Location,
+		&i.Checksum,
 	)
 	return i, err
 }
 
 const findFileByNameAndDirectoryId = `-- name: FindFileByNameAndDirectoryId :one
-SELECT id, user_id, directory_id, name, size, location
+SELECT id, user_id, directory_id, name, size, location, checksum
 FROM files
 WHERE name = $1
 AND directory_id IS NOT DISTINCT FROM $2
@@ -131,12 +132,13 @@ func (q *Queries) FindFileByNameAndDirectoryId(ctx context.Context, arg FindFile
 		&i.Name,
 		&i.Size,
 		&i.Location,
+		&i.Checksum,
 	)
 	return i, err
 }
 
 const findFiles = `-- name: FindFiles :many
-SELECT id, user_id, directory_id, name, size, location
+SELECT id, user_id, directory_id, name, size, location, checksum
 FROM files
 WHERE directory_id = $1
 `
@@ -157,6 +159,7 @@ func (q *Queries) FindFiles(ctx context.Context, directoryID uuid.NullUUID) ([]F
 			&i.Name,
 			&i.Size,
 			&i.Location,
+			&i.Checksum,
 		); err != nil {
 			return nil, err
 		}
@@ -172,7 +175,7 @@ func (q *Queries) FindFiles(ctx context.Context, directoryID uuid.NullUUID) ([]F
 }
 
 const findFilesByLocation = `-- name: FindFilesByLocation :many
-SELECT id, user_id, directory_id, name, size, location
+SELECT id, user_id, directory_id, name, size, location, checksum
 FROM files
 WHERE location LIKE $1 || '%'
 `
@@ -193,6 +196,7 @@ func (q *Queries) FindFilesByLocation(ctx context.Context, dollar_1 sql.NullStri
 			&i.Name,
 			&i.Size,
 			&i.Location,
+			&i.Checksum,
 		); err != nil {
 			return nil, err
 		}
@@ -369,8 +373,8 @@ func (q *Queries) SaveDirectoryItem(ctx context.Context, arg SaveDirectoryItemPa
 }
 
 const saveFile = `-- name: SaveFile :exec
-INSERT INTO files(id, user_id, directory_id, name, size, location)
-VALUES($1, $2, $3, $4, $5, $6)
+INSERT INTO files(id, user_id, directory_id, name, size, location, checksum)
+VALUES($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT(id)
 DO UPDATE SET
 	user_id = EXCLUDED.user_id,
@@ -387,6 +391,7 @@ type SaveFileParams struct {
 	Name        string
 	Size        int32
 	Location    string
+	Checksum    string
 }
 
 func (q *Queries) SaveFile(ctx context.Context, arg SaveFileParams) error {
@@ -397,6 +402,7 @@ func (q *Queries) SaveFile(ctx context.Context, arg SaveFileParams) error {
 		arg.Name,
 		arg.Size,
 		arg.Location,
+		arg.Checksum,
 	)
 	return err
 }

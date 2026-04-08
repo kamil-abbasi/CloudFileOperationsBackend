@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -26,34 +28,39 @@ func (storage *FileSystemAdapter) FileExists(key string) (bool, error) {
 	return shared.DoesFileExist(path)
 }
 
-func (storage *FileSystemAdapter) UploadFile(key string, src io.Reader) (int64, error) {
+func (storage *FileSystemAdapter) UploadFile(key string, src io.Reader) (int64, string, error) {
 	path := filepath.Clean(filepath.Join(storage.config.RootPath, key))
 
 	exists, err := shared.DoesFileExist(path)
 
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	if exists {
-		return 0, ErrAlreadyExists
+		return 0, "", ErrAlreadyExists
 	}
+
+	hash := sha256.New()
+	tee := io.TeeReader(src, hash)
 
 	file, err := os.Create(path)
 
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	defer file.Close()
 
-	bytesWritten, err := io.Copy(file, src)
+	bytesWritten, err := io.Copy(file, tee)
 
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
-	return bytesWritten, nil
+	finalHash := hex.EncodeToString(hash.Sum(nil))
+
+	return bytesWritten, finalHash, nil
 }
 
 func (storage *FileSystemAdapter) DownloadFile(key string) (io.ReadCloser, bool, error) {

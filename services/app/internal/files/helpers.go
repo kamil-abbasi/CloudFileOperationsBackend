@@ -14,6 +14,7 @@ func EntityToDto(entity entities.File) dtos.FileResponseDto {
 		Name:        entity.Name,
 		Size:        entity.Size,
 		Location:    entity.Location,
+		Checksum:    entity.Checksum,
 	}
 }
 
@@ -24,6 +25,7 @@ func DatabaseToEntity(file database.File) entities.File {
 		Name:     file.Name,
 		Size:     uint64(file.Size),
 		Location: file.Location,
+		Checksum: file.Checksum,
 	}
 
 	if file.DirectoryID.Valid {

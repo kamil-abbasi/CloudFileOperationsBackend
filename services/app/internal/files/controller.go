@@ -57,6 +57,7 @@ func (c *FilesController) Upload(ctx *gin.Context) {
 	file, err := c.filesService.Create(userId, dtos.CreateFileDto{
 		Name:        dto.File.Filename,
 		DirectoryId: dto.DirectoryId,
+		Checksum:    dto.Checksum,
 	}, reader)
 
 	if err != nil {
