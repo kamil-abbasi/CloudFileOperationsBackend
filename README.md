@@ -4,6 +4,10 @@ This project is a backend for storing and managing files.
 
 # The MVP
 
+## Technical
+
+[x] ETag and If-None-Match handling
+
 ## Files
 
 [x] upload
@@ -19,6 +23,8 @@ This project is a backend for storing and managing files.
 [] move
 
 [x] rename
+
+[] partial uploads
 
 ## Directories
 
@@ -48,9 +54,9 @@ This project is a backend for storing and managing files.
 
 ## Authn & Authz
 
-[] create account
+[x] create account
 
-[] log in
+[x] log in
 
 # How To Run
 
