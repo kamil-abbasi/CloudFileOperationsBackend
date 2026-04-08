@@ -46,9 +46,18 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      database:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       file-storage:
+        condition: service_healthy
+
+  migrate:
+    build:
+      context: ./services/app
+      target: dev
+    command: chmod u+x ./db-migrate.sh && ./db-migrate.sh
+    depends_on:
+      database:
         condition: service_healthy
 
   file-storage:
@@ -79,6 +88,8 @@ services:
       timeout: 30s
       retries: 5
       start_period: 20s
+    ports:
+      - 5432:5432
 volumes:
   app-data:
   db-data:

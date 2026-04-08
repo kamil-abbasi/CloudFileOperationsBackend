@@ -88,7 +88,7 @@ Backend consists of 4 services:
 | ------- | ---- |
 | reverse proxy | 8080 |
 | app service | not exposed |
-| database | not exposed |
+| database | 5432 (not exposed in production) |
 | file storage | not exposed |
 
 # Architecture

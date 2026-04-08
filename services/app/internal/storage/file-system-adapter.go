@@ -10,23 +10,23 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/shared"
 )
 
-type FileSystemStorageAdapter struct {
+type FileSystemAdapter struct {
 	config *config.Config
 }
 
 func NewFileSystemAdapter(config *config.Config) IStorage {
-	return &FileSystemStorageAdapter{
+	return &FileSystemAdapter{
 		config: config,
 	}
 }
 
-func (storage *FileSystemStorageAdapter) FileExists(key string) (bool, error) {
+func (storage *FileSystemAdapter) FileExists(key string) (bool, error) {
 	path := filepath.Clean(filepath.Join(storage.config.RootPath, key))
 
 	return shared.DoesFileExist(path)
 }
 
-func (storage *FileSystemStorageAdapter) UploadFile(key string, src io.Reader) (int64, error) {
+func (storage *FileSystemAdapter) UploadFile(key string, src io.Reader) (int64, error) {
 	path := filepath.Clean(filepath.Join(storage.config.RootPath, key))
 
 	exists, err := shared.DoesFileExist(path)
@@ -56,7 +56,7 @@ func (storage *FileSystemStorageAdapter) UploadFile(key string, src io.Reader) (
 	return bytesWritten, nil
 }
 
-func (storage *FileSystemStorageAdapter) DownloadFile(key string) (io.ReadCloser, bool, error) {
+func (storage *FileSystemAdapter) DownloadFile(key string) (io.ReadCloser, bool, error) {
 	path := filepath.Clean(filepath.Join(storage.config.RootPath, key))
 
 	exists, err := shared.DoesFileExist(path)
@@ -78,7 +78,7 @@ func (storage *FileSystemStorageAdapter) DownloadFile(key string) (io.ReadCloser
 	return file, true, nil
 }
 
-func (storage *FileSystemStorageAdapter) RemoveFile(key string) (bool, error) {
+func (storage *FileSystemAdapter) RemoveFile(key string) (bool, error) {
 	path := filepath.Clean(filepath.Join(storage.config.RootPath, key))
 
 	err := os.Remove(path)

@@ -14,25 +14,23 @@ import (
 )
 
 type FilesPostgresRepository struct {
-	db      *sql.DB
-	queries *database.Queries
+	db *database.Postgres
 }
 
-func NewPostgresRepository(db *sql.DB, queries *database.Queries) IFilesRepository {
+func NewPostgresRepository(db *database.Postgres) IFilesRepository {
 	return &FilesPostgresRepository{
-		db:      db,
-		queries: queries,
+		db: db,
 	}
 }
 
-func (repository *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entities.File, error) {
+func (r *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entities.File, error) {
 	directoryID, err := parseOptionalUUID(dto.Where.DirectoryId)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse directory id, details: %v", err)
 	}
 
-	files, err := repository.queries.FindFiles(context.Background(), directoryID)
+	files, err := r.db.Queries.FindFiles(context.Background(), directoryID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find files: %v", err)
@@ -43,8 +41,8 @@ func (repository *FilesPostgresRepository) Find(dto dtos.FindFilesDto) ([]entiti
 	return result, nil
 }
 
-func (repository *FilesPostgresRepository) FindByLocation(location string) ([]entities.File, error) {
-	files, err := repository.queries.FindFilesByLocation(context.Background(), sql.NullString{String: location, Valid: true})
+func (r *FilesPostgresRepository) FindByLocation(location string) ([]entities.File, error) {
+	files, err := r.db.Queries.FindFilesByLocation(context.Background(), sql.NullString{String: location, Valid: true})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find files: %v", err)
@@ -55,7 +53,7 @@ func (repository *FilesPostgresRepository) FindByLocation(location string) ([]en
 	return result, nil
 }
 
-func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bool, error) {
+func (r *FilesPostgresRepository) FindOne(id string) (entities.File, bool, error) {
 	if id == "" {
 		return entities.File{}, false, nil
 	}
@@ -66,7 +64,7 @@ func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bo
 		return entities.File{}, false, fmt.Errorf("failed to parse file id, details: %v", err)
 	}
 
-	file, err := repository.queries.FindFileById(context.Background(), fileID)
+	file, err := r.db.Queries.FindFileById(context.Background(), fileID)
 
 	if err == sql.ErrNoRows {
 		return entities.File{}, false, nil
@@ -79,14 +77,14 @@ func (repository *FilesPostgresRepository) FindOne(id string) (entities.File, bo
 	return DatabaseToEntity(file), true, nil
 }
 
-func (repository *FilesPostgresRepository) FindByNameAndDirectoryId(name string, directoryId string) (entities.File, bool, error) {
+func (r *FilesPostgresRepository) FindByNameAndDirectoryId(name string, directoryId string) (entities.File, bool, error) {
 	queryDirID, err := parseOptionalUUID(directoryId)
 
 	if err != nil {
 		return entities.File{}, false, fmt.Errorf("failed to parse directory id, details: %v", err)
 	}
 
-	file, err := repository.queries.FindFileByNameAndDirectoryId(context.Background(), database.FindFileByNameAndDirectoryIdParams{
+	file, err := r.db.Queries.FindFileByNameAndDirectoryId(context.Background(), database.FindFileByNameAndDirectoryIdParams{
 		Name:        name,
 		DirectoryID: queryDirID,
 	})
@@ -102,7 +100,7 @@ func (repository *FilesPostgresRepository) FindByNameAndDirectoryId(name string,
 	return DatabaseToEntity(file), true, nil
 }
 
-func (repository *FilesPostgresRepository) Save(file entities.File) error {
+func (r *FilesPostgresRepository) Save(file entities.File) error {
 	fileID, err := uuid.Parse(file.Id)
 
 	if err != nil {
@@ -127,7 +125,7 @@ func (repository *FilesPostgresRepository) Save(file entities.File) error {
 
 	ctx := context.Background()
 
-	tx, err := repository.db.BeginTx(ctx, nil)
+	tx, err := r.db.Conn.BeginTx(ctx, nil)
 
 	if err != nil {
 		return err
@@ -135,7 +133,7 @@ func (repository *FilesPostgresRepository) Save(file entities.File) error {
 
 	defer tx.Rollback()
 
-	queries := repository.queries.WithTx(tx)
+	queries := r.db.Queries.WithTx(tx)
 
 	err = queries.SaveFile(ctx, database.SaveFileParams{
 		ID:          fileID,
@@ -168,7 +166,7 @@ func (repository *FilesPostgresRepository) Save(file entities.File) error {
 	return nil
 }
 
-func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
+func (r *FilesPostgresRepository) Remove(id string) (bool, error) {
 	fileID, err := uuid.Parse(id)
 
 	if err != nil {
@@ -177,7 +175,7 @@ func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
 
 	ctx := context.Background()
 
-	tx, err := repository.db.BeginTx(ctx, nil)
+	tx, err := r.db.Conn.BeginTx(ctx, nil)
 
 	if err != nil {
 		return false, err
@@ -185,7 +183,7 @@ func (repository *FilesPostgresRepository) Remove(id string) (bool, error) {
 
 	defer tx.Rollback()
 
-	queries := repository.queries.WithTx(tx)
+	queries := r.db.Queries.WithTx(tx)
 
 	rowsAffected, err := queries.RemoveFileRows(ctx, fileID)
 

@@ -107,6 +107,6 @@ func (s *AuthService) Login(dto dtos.LoginUserDto) (dtos.LoginUserResponseDto, e
 	}
 
 	return dtos.LoginUserResponseDto{
-		Token: tokenString,
+		AccessToken: tokenString,
 	}, nil
 }

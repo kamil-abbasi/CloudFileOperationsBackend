@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS users;
+
+DROP TABLE IF EXISTS directory_items;
+
+DROP TABLE IF EXISTS files;
+
+DROP TABLE IF EXISTS directories;

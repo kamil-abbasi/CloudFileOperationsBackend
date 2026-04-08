@@ -12,19 +12,17 @@ import (
 )
 
 type DirectoriesPostgresRepository struct {
-	db      *sql.DB
-	queries *database.Queries
+	db *database.Postgres
 }
 
-func NewPostgresRepository(db *sql.DB, queries *database.Queries) IDirectoriesRepository {
+func NewPostgresRepository(db *database.Postgres) IDirectoriesRepository {
 	return &DirectoriesPostgresRepository{
-		db:      db,
-		queries: queries,
+		db: db,
 	}
 }
 
-func (repository *DirectoriesPostgresRepository) ListItems(location string) ([]entities.DirectoryItem, error) {
-	items, err := repository.queries.ListDirectoryItems(context.Background(), location)
+func (r *DirectoriesPostgresRepository) ListItems(location string) ([]entities.DirectoryItem, error) {
+	items, err := r.db.Queries.ListDirectoryItems(context.Background(), location)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find directory items: %v", err)
@@ -35,8 +33,8 @@ func (repository *DirectoriesPostgresRepository) ListItems(location string) ([]e
 	return result, nil
 }
 
-func (repository *DirectoriesPostgresRepository) Find() ([]entities.Directory, error) {
-	directories, err := repository.queries.FindDirectories(context.Background())
+func (r *DirectoriesPostgresRepository) Find() ([]entities.Directory, error) {
+	directories, err := r.db.Queries.FindDirectories(context.Background())
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find directories: %v", err)
@@ -47,7 +45,7 @@ func (repository *DirectoriesPostgresRepository) Find() ([]entities.Directory, e
 	return result, nil
 }
 
-func (repository *DirectoriesPostgresRepository) FindOne(id string) (entities.Directory, bool, error) {
+func (r *DirectoriesPostgresRepository) FindOne(id string) (entities.Directory, bool, error) {
 	if id == "" {
 		return entities.Directory{}, false, nil
 	}
@@ -58,7 +56,7 @@ func (repository *DirectoriesPostgresRepository) FindOne(id string) (entities.Di
 		return entities.Directory{}, false, fmt.Errorf("failed to parse directory id, details: %v", err)
 	}
 
-	directory, err := repository.queries.FindDirectoryById(context.Background(), directoryID)
+	directory, err := r.db.Queries.FindDirectoryById(context.Background(), directoryID)
 
 	if err == sql.ErrNoRows {
 		return entities.Directory{}, false, nil
@@ -71,14 +69,14 @@ func (repository *DirectoriesPostgresRepository) FindOne(id string) (entities.Di
 	return DatabaseToEntity(directory), true, nil
 }
 
-func (repository *DirectoriesPostgresRepository) FindByNameAndParentId(name string, parentId string) (entities.Directory, bool, error) {
+func (r *DirectoriesPostgresRepository) FindByNameAndParentId(name string, parentId string) (entities.Directory, bool, error) {
 	queryParentID, err := parseOptionalUUID(parentId)
 
 	if err != nil {
 		return entities.Directory{}, false, fmt.Errorf("failed to parse parent id, details: %v", err)
 	}
 
-	directory, err := repository.queries.FindDirectoryByNameAndParentId(context.Background(), database.FindDirectoryByNameAndParentIdParams{
+	directory, err := r.db.Queries.FindDirectoryByNameAndParentId(context.Background(), database.FindDirectoryByNameAndParentIdParams{
 		Name:     name,
 		ParentID: queryParentID,
 	})
@@ -94,7 +92,7 @@ func (repository *DirectoriesPostgresRepository) FindByNameAndParentId(name stri
 	return DatabaseToEntity(directory), true, nil
 }
 
-func (repository *DirectoriesPostgresRepository) Save(directory entities.Directory) error {
+func (r *DirectoriesPostgresRepository) Save(directory entities.Directory) error {
 	directoryID, err := uuid.Parse(directory.Id)
 
 	if err != nil {
@@ -115,7 +113,7 @@ func (repository *DirectoriesPostgresRepository) Save(directory entities.Directo
 
 	ctx := context.Background()
 
-	tx, err := repository.db.BeginTx(ctx, nil)
+	tx, err := r.db.Conn.BeginTx(ctx, nil)
 
 	if err != nil {
 		return err
@@ -123,7 +121,7 @@ func (repository *DirectoriesPostgresRepository) Save(directory entities.Directo
 
 	defer tx.Rollback()
 
-	queries := repository.queries.WithTx(tx)
+	queries := r.db.Queries.WithTx(tx)
 
 	err = queries.SaveDirectory(ctx, database.SaveDirectoryParams{
 		ID:       directoryID,
@@ -155,7 +153,7 @@ func (repository *DirectoriesPostgresRepository) Save(directory entities.Directo
 	return nil
 }
 
-func (repository *DirectoriesPostgresRepository) Remove(id string) (bool, error) {
+func (r *DirectoriesPostgresRepository) Remove(id string) (bool, error) {
 	directoryID, err := uuid.Parse(id)
 
 	if err != nil {
@@ -164,7 +162,7 @@ func (repository *DirectoriesPostgresRepository) Remove(id string) (bool, error)
 
 	ctx := context.Background()
 
-	tx, err := repository.db.BeginTx(ctx, nil)
+	tx, err := r.db.Conn.BeginTx(ctx, nil)
 
 	if err != nil {
 		return false, err
@@ -172,7 +170,7 @@ func (repository *DirectoriesPostgresRepository) Remove(id string) (bool, error)
 
 	defer tx.Rollback()
 
-	queries := repository.queries.WithTx(tx)
+	queries := r.db.Queries.WithTx(tx)
 
 	rowsAffected, err := queries.RemoveDirectoryRows(ctx, directoryID)
 

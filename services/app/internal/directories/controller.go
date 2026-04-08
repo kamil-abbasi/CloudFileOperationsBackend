@@ -5,18 +5,18 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/cache"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories/dtos"
-	"github.com/patrickmn/go-cache"
 )
 
 type DirectoriesController struct {
 	config             *config.Config
-	cache              *cache.Cache
+	cache              cache.ICache
 	directoriesService *DirectoriesService
 }
 
-func NewController(config *config.Config, cache *cache.Cache, directoriesService *DirectoriesService) *DirectoriesController {
+func NewController(config *config.Config, cache cache.ICache, directoriesService *DirectoriesService) *DirectoriesController {
 	return &DirectoriesController{
 		cache:              cache,
 		config:             config,

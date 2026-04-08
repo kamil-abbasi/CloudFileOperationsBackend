@@ -12,14 +12,12 @@ import (
 )
 
 type PostgresUsersRepository struct {
-	db      *sql.DB
-	queries *database.Queries
+	db *database.Postgres
 }
 
-func NewPostgresRepository(db *sql.DB, queries *database.Queries) interfaces.IUsersRepository {
+func NewPostgresRepository(db *database.Postgres) interfaces.IUsersRepository {
 	return &PostgresUsersRepository{
-		db:      db,
-		queries: queries,
+		db: db,
 	}
 }
 
@@ -28,7 +26,7 @@ func (r *PostgresUsersRepository) FindByName(name string) (entities.User, bool, 
 		return entities.User{}, false, nil
 	}
 
-	user, err := r.queries.FindUserByName(context.Background(), name)
+	user, err := r.db.Queries.FindUserByName(context.Background(), name)
 
 	if err == sql.ErrNoRows {
 		return entities.User{}, false, nil
@@ -52,7 +50,7 @@ func (r *PostgresUsersRepository) Save(entity entities.User) error {
 		return fmt.Errorf("failed to parse user id, details: %v", err)
 	}
 
-	err = r.queries.SaveUser(context.Background(), database.SaveUserParams{
+	err = r.db.Queries.SaveUser(context.Background(), database.SaveUserParams{
 		ID:           userID,
 		Name:         entity.Name,
 		PasswordHash: entity.PasswordHash,
@@ -76,7 +74,7 @@ func (r *PostgresUsersRepository) Remove(id string) (bool, error) {
 		return false, fmt.Errorf("failed to parse user id, details: %v", err)
 	}
 
-	rowsAffected, err := r.queries.RemoveUserRows(context.Background(), userID)
+	rowsAffected, err := r.db.Queries.RemoveUserRows(context.Background(), userID)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to remove user from postgres, details: %v", err)

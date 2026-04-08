@@ -14,8 +14,22 @@ import (
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/usage"
 )
 
-func NewRouter(filesController *files.FilesController, directoriesController *directories.DirectoriesController, usageController *usage.UsageController, authController *auth.AuthController, cfg *config.Config) *gin.Engine {
+type RouterParams struct {
+	FilesController       *files.FilesController
+	DirectoriesController *directories.DirectoriesController
+	UsageController       *usage.UsageController
+	AuthController        *auth.AuthController
+	Cfg                   *config.Config
+}
+
+func NewRouter(params RouterParams) *gin.Engine {
 	r := gin.Default()
+
+	filesController := params.FilesController
+	directoriesController := params.DirectoriesController
+	usageController := params.UsageController
+	authController := params.AuthController
+	cfg := params.Cfg
 
 	r.Use(middleware.Error())
 

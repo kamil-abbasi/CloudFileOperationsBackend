@@ -4,17 +4,16 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/api"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/auth"
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/cache"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/database"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/directories"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/storage"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/usage"
-	"github.com/patrickmn/go-cache"
 )
 
 func main() {
@@ -48,31 +47,42 @@ func Run() error {
 		return err
 	}
 
-	queries := database.New(postgres)
+	defer postgres.Conn.Close()
 
-	defer postgres.Close()
+	// general
+	cache := cache.NewInMemoryAdapter()
+	storage := storage.NewFileSystemAdapter(cfg)
 
-	cache := cache.New(15*time.Minute, 10*time.Minute)
+	// repos
+	filesRepository := files.NewPostgresRepository(postgres)
+	directoriesRepository := directories.NewPostgresRepository(postgres)
+	usersRepository := auth.NewPostgresRepository(postgres)
 
-	storageAdapter := storage.NewFileSystemAdapter(cfg)
-
-	filesRepository := files.NewPostgresRepository(postgres, queries)
-	directoriesRepository := directories.NewPostgresRepository(postgres, queries)
-	usersRepository := auth.NewPostgresRepository(postgres, queries)
-
-	filesService := files.NewService(filesRepository, directoriesRepository, storageAdapter)
-	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storageAdapter)
+	// services
+	filesService := files.NewService(filesRepository, directoriesRepository, storage)
+	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storage)
 	usageService := usage.NewService(filesService)
 	authService := auth.NewService(usersRepository, cfg)
 
+	// controllers
 	filesController := files.NewController(cfg, cache, filesService)
 	directoriesController := directories.NewController(cfg, cache, directoriesService)
 	usageController := usage.NewController(usageService)
 	authController := auth.NewController(authService)
 
-	r := api.NewRouter(filesController, directoriesController, usageController, authController, cfg)
-	r.SetTrustedProxies([]string{"reverse-proxy"})
-	r.Run()
+	r := api.NewRouter(api.RouterParams{
+		FilesController:       filesController,
+		DirectoriesController: directoriesController,
+		UsageController:       usageController,
+		AuthController:        authController,
+		Cfg:                   cfg,
+	})
+	err = r.SetTrustedProxies([]string{"reverse-proxy"})
+	err = r.Run()
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

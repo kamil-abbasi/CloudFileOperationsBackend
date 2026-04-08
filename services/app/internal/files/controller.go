@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
 
+	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/cache"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/config"
 	"github.com/kamil-abbasi/CloudFileOperationsBackend/internal/files/dtos"
 )
 
 type FilesController struct {
 	config       *config.Config
-	cache        *cache.Cache
+	cache        cache.ICache
 	filesService *FilesService
 }
 
-func NewController(config *config.Config, cache *cache.Cache, filesService *FilesService) *FilesController {
+func NewController(config *config.Config, cache cache.ICache, filesService *FilesService) *FilesController {
 	return &FilesController{
 		cache:        cache,
 		config:       config,

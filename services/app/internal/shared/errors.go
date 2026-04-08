@@ -1,7 +1,7 @@
 package shared
 
 type HttpError struct {
-	Message string
-	Code    uint16
-	Details map[string]any
+	Message string         `json:"message"`
+	Code    uint16         `json:"code"`
+	Details map[string]any `json:"details"`
 }
