@@ -51,12 +51,15 @@ func (s *AuthService) Register(dto dtos.RegisterUserDto) (dtos.RegisterUserRespo
 		Id:           uuid.NewString(),
 		Name:         dto.Name,
 		PasswordHash: passwordHash,
+		MaxStorage:   s.config.DefaultMaxUserStorage,
+		StorageUsed:  0,
 	}
 
 	s.usersRepository.Save(user)
 
 	return dtos.RegisterUserResponseDto{
-		Id: user.Id,
+		Id:         user.Id,
+		MaxStorage: user.MaxStorage,
 	}, nil
 }
 

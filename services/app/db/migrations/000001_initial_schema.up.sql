@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS users (
 	id UUID NOT NULL PRIMARY KEY,
 	name TEXT NOT NULL UNIQUE,
-	password_hash TEXT NOT NULL
+	password_hash TEXT NOT NULL,
+	max_storage BIGINT NOT NULL,
+  storage_used BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS directories (

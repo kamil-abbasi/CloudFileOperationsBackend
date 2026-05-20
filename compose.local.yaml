@@ -39,6 +39,7 @@ services:
       - PG_HOST=database
       - JWT_PRIVATE_KEY_PATH=jwt-private-key.pem
       - JWT_PUBLIC_KEY_PATH=jwt-public-key.pem
+      - DEFAULT_USER_MAX_STORAGE=2147483648
     healthcheck:
       test: ['CMD', './healthcheck']
       interval: 30s

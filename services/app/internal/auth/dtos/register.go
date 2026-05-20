@@ -7,5 +7,6 @@ type RegisterUserDto struct {
 }
 
 type RegisterUserResponseDto struct {
-	Id string `json:"id"`
+	Id         string `json:"id"`
+	MaxStorage uint64 `json:"maxStorage"`
 }

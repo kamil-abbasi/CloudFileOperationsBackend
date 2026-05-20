@@ -94,12 +94,19 @@ SELECT *
 FROM users
 WHERE name = $1;
 
+-- name: FindUserById :one
+SELECT *
+FROM users
+WHERE id = $1;
+
 -- name: SaveUser :exec
-INSERT INTO users(id, name, password_hash)
-VALUES($1, $2, $3)
+INSERT INTO users(id, name, password_hash, max_storage, storage_used)
+VALUES($1, $2, $3, $4, $5)
 ON CONFLICT(id)
 DO UPDATE SET
-name = EXCLUDED.name;
+name = EXCLUDED.name,
+max_storage = EXCLUDED.max_storage,
+storage_used = EXCLUDED.storage_used;
 
 -- name: RemoveUserRows :execrows
 DELETE FROM users WHERE id = $1;

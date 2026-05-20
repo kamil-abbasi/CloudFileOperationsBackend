@@ -59,7 +59,7 @@ func Run() error {
 	usersRepository := auth.NewPostgresRepository(postgres)
 
 	// services
-	filesService := files.NewService(filesRepository, directoriesRepository, storage)
+	filesService := files.NewService(filesRepository, directoriesRepository, storage, usersRepository)
 	directoriesService := directories.NewService(cfg, directoriesRepository, filesRepository, storage)
 	usageService := usage.NewService(filesService)
 	authService := auth.NewService(usersRepository, cfg)

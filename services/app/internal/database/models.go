@@ -81,4 +81,6 @@ type User struct {
 	ID           uuid.UUID
 	Name         string
 	PasswordHash string
+	MaxStorage   int64
+	StorageUsed  int64
 }

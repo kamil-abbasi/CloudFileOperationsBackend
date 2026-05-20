@@ -7,18 +7,19 @@ import (
 )
 
 type Config struct {
-	Port              uint32
-	RootPath          string
-	MaxUploadBytes    uint64
-	UsageCacheTTL     uint32
-	LogLevel          string
-	GinMode           string
-	PgDb              string
-	PgUser            string
-	PgPassword        string
-	PgHost            string
-	JwtPrivateKeyPath string
-	JwtPublicKeyPath  string
+	Port                  uint32
+	RootPath              string
+	MaxUploadBytes        uint64
+	UsageCacheTTL         uint32
+	LogLevel              string
+	GinMode               string
+	PgDb                  string
+	PgUser                string
+	PgPassword            string
+	PgHost                string
+	JwtPrivateKeyPath     string
+	JwtPublicKeyPath      string
+	DefaultMaxUserStorage uint64
 }
 
 func Load() (*Config, error) {
@@ -36,6 +37,7 @@ func Load() (*Config, error) {
 	pgHost := os.Getenv("PG_HOST")
 	jwtPrivateKeyPath := os.Getenv("JWT_PRIVATE_KEY_PATH")
 	jwtPublicKeyPath := os.Getenv("JWT_PUBLIC_KEY_PATH")
+	defaultMaxUserStorageStr := os.Getenv("DEFAULT_USER_MAX_STORAGE")
 
 	port, err := strconv.Atoi(portStr)
 
@@ -55,6 +57,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("USAGE_CACHE_TTL must be an integer")
 	}
 
+	defaultMaxUserStorage, err := strconv.Atoi(defaultMaxUserStorageStr)
+
+	if err != nil {
+		return nil, fmt.Errorf("DEFAULT_USER_MAX_STORAGE must be an integer")
+	}
+
 	config.MaxUploadBytes = uint64(maxUploadBytes)
 	config.Port = uint32(port)
 	config.RootPath = rootPath
@@ -67,6 +75,7 @@ func Load() (*Config, error) {
 	config.PgHost = pgHost
 	config.JwtPrivateKeyPath = jwtPrivateKeyPath
 	config.JwtPublicKeyPath = jwtPublicKeyPath
+	config.DefaultMaxUserStorage = uint64(defaultMaxUserStorage)
 
 	return config, nil
 }

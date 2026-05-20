@@ -211,8 +211,27 @@ func (q *Queries) FindFilesByLocation(ctx context.Context, dollar_1 sql.NullStri
 	return items, nil
 }
 
+const findUserById = `-- name: FindUserById :one
+SELECT id, name, password_hash, max_storage, storage_used
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) FindUserById(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, findUserById, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PasswordHash,
+		&i.MaxStorage,
+		&i.StorageUsed,
+	)
+	return i, err
+}
+
 const findUserByName = `-- name: FindUserByName :one
-SELECT id, name, password_hash
+SELECT id, name, password_hash, max_storage, storage_used
 FROM users
 WHERE name = $1
 `
@@ -220,7 +239,13 @@ WHERE name = $1
 func (q *Queries) FindUserByName(ctx context.Context, name string) (User, error) {
 	row := q.db.QueryRowContext(ctx, findUserByName, name)
 	var i User
-	err := row.Scan(&i.ID, &i.Name, &i.PasswordHash)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PasswordHash,
+		&i.MaxStorage,
+		&i.StorageUsed,
+	)
 	return i, err
 }
 
@@ -425,20 +450,30 @@ func (q *Queries) SaveFileItem(ctx context.Context, arg SaveFileItemParams) erro
 }
 
 const saveUser = `-- name: SaveUser :exec
-INSERT INTO users(id, name, password_hash)
-VALUES($1, $2, $3)
+INSERT INTO users(id, name, password_hash, max_storage, storage_used)
+VALUES($1, $2, $3, $4, $5)
 ON CONFLICT(id)
 DO UPDATE SET
-name = EXCLUDED.name
+name = EXCLUDED.name,
+max_storage = EXCLUDED.max_storage,
+storage_used = EXCLUDED.storage_used
 `
 
 type SaveUserParams struct {
 	ID           uuid.UUID
 	Name         string
 	PasswordHash string
+	MaxStorage   int64
+	StorageUsed  int64
 }
 
 func (q *Queries) SaveUser(ctx context.Context, arg SaveUserParams) error {
-	_, err := q.db.ExecContext(ctx, saveUser, arg.ID, arg.Name, arg.PasswordHash)
+	_, err := q.db.ExecContext(ctx, saveUser,
+		arg.ID,
+		arg.Name,
+		arg.PasswordHash,
+		arg.MaxStorage,
+		arg.StorageUsed,
+	)
 	return err
 }

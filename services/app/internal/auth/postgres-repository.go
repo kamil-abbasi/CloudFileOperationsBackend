@@ -40,6 +40,38 @@ func (r *PostgresUsersRepository) FindByName(name string) (entities.User, bool, 
 		Id:           user.ID.String(),
 		Name:         user.Name,
 		PasswordHash: user.PasswordHash,
+		MaxStorage:   uint64(user.MaxStorage),
+		StorageUsed:  uint64(user.StorageUsed),
+	}, true, nil
+}
+
+func (r *PostgresUsersRepository) FindOne(id string) (entities.User, bool, error) {
+	if id == "" {
+		return entities.User{}, false, nil
+	}
+
+	userId, err := uuid.Parse(id)
+
+	if err != nil {
+		return entities.User{}, false, fmt.Errorf("failed to parse user id, details: %v", err)
+	}
+
+	user, err := r.db.Queries.FindUserById(context.Background(), userId)
+
+	if err == sql.ErrNoRows {
+		return entities.User{}, false, nil
+	}
+
+	if err != nil {
+		return entities.User{}, false, fmt.Errorf("failed to find user by id, details: %v", err)
+	}
+
+	return entities.User{
+		Id:           user.ID.String(),
+		Name:         user.Name,
+		PasswordHash: user.PasswordHash,
+		MaxStorage:   uint64(user.MaxStorage),
+		StorageUsed:  uint64(user.StorageUsed),
 	}, true, nil
 }
 
@@ -54,6 +86,8 @@ func (r *PostgresUsersRepository) Save(entity entities.User) error {
 		ID:           userID,
 		Name:         entity.Name,
 		PasswordHash: entity.PasswordHash,
+		MaxStorage:   int64(entity.MaxStorage),
+		StorageUsed:  int64(entity.StorageUsed),
 	})
 
 	if err != nil {
